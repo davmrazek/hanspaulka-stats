@@ -25,3 +25,11 @@ against these files, never against the live site.
   `cmd=stats&subtype=shooters|goalkeepers|offensive|defensive`,
   `cmd=referees` (rozpis pískání data).
 - robots.txt (checked 2026-07-06) disallows only `/cms/` — `/souteze/` is allowed.
+- `cmd=results` and `cmd=tables` return JSON `{"html": ...}`; `cmd=stats`
+  returns **raw HTML**, not JSON.
+- **Kontumace (forfeit)**: the official score is the awarded one (e.g. 0:6)
+  while goal events still list the on-pitch goals (gameid 301573, 2025-podzim
+  6-A round 10: result 0:6, HT (7:0), 12+3 scorer entries; commentary says
+  "Zápas byl kontumován"). So `home_goals`/`away_goals` may legitimately
+  disagree with COUNT(goals). PSMF's own Střelci stats DO count goals from
+  forfeited matches.
