@@ -1,0 +1,19 @@
+# raw HTML cache
+cache/
+
+# SQLite database
+data/
+
+# generated site (keep CNAME if added later)
+site/*
+!site/CNAME
+
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# macOS
+.DS_Store
