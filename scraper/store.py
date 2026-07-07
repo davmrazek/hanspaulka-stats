@@ -16,6 +16,7 @@ produce the same database.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -167,8 +168,29 @@ def upsert_group(conn, season_id: int, tier: int, letter: str, url: str) -> int:
 
 
 def upsert_team(conn, name: str) -> int:
-    # canonical_name == name until Phase 2 canonicalization
+    # canonical_name == name by default; merged manually after review
+    # (see find_name_conflicts and README "Team name canonicalization")
     return _get_or_create(conn, "teams", {"name": name}, {"canonical_name": name})
+
+
+def normalize_team_name(name: str) -> str:
+    """Conservative normalization used only to FLAG likely duplicates for
+    manual review — never to merge automatically."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", name)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = re.sub(r"[^\w\s]", " ", text.casefold())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def find_name_conflicts(conn) -> list[tuple[str, list[str]]]:
+    """Teams whose normalized names collide but stored names differ.
+    Candidates for canonical_name merging; resolve manually."""
+    groups: dict[str, list[str]] = {}
+    for (name,) in conn.execute("SELECT name FROM teams ORDER BY name"):
+        groups.setdefault(normalize_team_name(name), []).append(name)
+    return [(norm, names) for norm, names in groups.items() if len(names) > 1]
 
 
 def upsert_player(conn, name: str, team_id: int) -> int:

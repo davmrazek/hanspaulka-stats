@@ -323,10 +323,16 @@ def parse_standings_html(html: str) -> tuple[StandingRow, ...]:
 
 
 def parse_piskani(html: str) -> tuple[RefereeDuty, ...]:
-    """Parse referee duty schedule (table.referees-table) from any page."""
+    """Parse referee duty schedule (table.referees-table) from any page.
+
+    Top tiers get PSMF-assigned referees and have no duty rozpis — the page
+    then shows 'Nenalezen žádná záznam' (sic) instead of a table.
+    """
     soup = BeautifulSoup(html, "lxml")
     table = soup.find("table", class_="referees-table")
     if table is None:
+        if "Nenalezen" in html:
+            return ()
         raise ParseError("no referees-table found")
     duties = []
     for tr in table.find_all("tr"):
@@ -344,9 +350,38 @@ def parse_piskani(html: str) -> tuple[RefereeDuty, ...]:
                 team=_clean(tds[3].get_text()),
             )
         )
-    if not duties:
-        raise ParseError("referees-table has no data rows")
     return tuple(duties)
+
+
+# --- season index ------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class GroupRef:
+    tier: int
+    letter: str
+    url: str  # relative, e.g. /souteze/2025-hanspaulska-liga-podzim/6-a/
+
+
+def parse_season_index(html: str, season_slug_path: str) -> tuple[GroupRef, ...]:
+    """Discover groups from a season index page. Never hardcode group lists.
+
+    season_slug_path: URL path of the season, e.g.
+    '/souteze/2025-hanspaulska-liga-podzim/'.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    pattern = re.compile(
+        re.escape(season_slug_path.rstrip("/")) + r"/(\d+)-([a-z])/$"
+    )
+    groups: dict[tuple[int, str], GroupRef] = {}
+    for a in soup.find_all("a", href=True):
+        m = pattern.match(a["href"])
+        if m:
+            tier, letter = int(m.group(1)), m.group(2)
+            groups[(tier, letter)] = GroupRef(tier, letter, a["href"])
+    if not groups:
+        raise ParseError(f"no group links found for {season_slug_path}")
+    return tuple(groups[k] for k in sorted(groups))
 
 
 # --- group page ------------------------------------------------------------

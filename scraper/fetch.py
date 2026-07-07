@@ -32,6 +32,11 @@ class FetchError(Exception):
     """Raised when a URL cannot be fetched after retries. Do not catch and retry."""
 
 
+class NotFoundError(FetchError):
+    """4xx response — the page does not exist. Never retried (used when
+    probing which seasons exist)."""
+
+
 def url_to_slug(url: str) -> str:
     """Turn a URL into a filesystem-safe cache filename."""
     slug = re.sub(r"^https?://", "", url)
@@ -71,6 +76,8 @@ def get(url: str, *, force: bool = False, cache_dir: Path | None = None) -> str:
             response = requests.get(
                 url, headers={"User-Agent": USER_AGENT}, timeout=30
             )
+            if 400 <= response.status_code < 500:
+                raise NotFoundError(f"{url} -> HTTP {response.status_code}")
             response.raise_for_status()
         except requests.RequestException as exc:
             last_error = exc
