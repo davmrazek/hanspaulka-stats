@@ -1,6 +1,6 @@
 # Weekly scrape of the current season (results complete by Monday evening,
-# see CLAUDE.md). DB is published as a rolling release asset, never committed
-# (data/ is gitignored by design).
+# see CLAUDE.md). The DB is published as a rolling release asset, never
+# committed (data/ is gitignored by design).
 name: weekly-scrape
 
 on:
