@@ -199,8 +199,13 @@ def main(argv: list[str] | None = None) -> int:
             scrape_season(conn, year, half, html, force=True)
 
         report_name_conflicts(conn)
-    except (fetch.FetchError, parse.ParseError) as exc:
-        print(f"FATAL: {exc}", file=sys.stderr)
+    except parse.ParseError as exc:
+        # site markup changed — do NOT auto-restart, fix the parser (exit 2)
+        print(f"FATAL (parse): {exc}", file=sys.stderr)
+        return 2
+    except fetch.FetchError as exc:
+        # transient network/server failure — safe to re-run, cache resumes (exit 1)
+        print(f"FATAL (fetch): {exc}", file=sys.stderr)
         return 1
     finally:
         conn.close()
