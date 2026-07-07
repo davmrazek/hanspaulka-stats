@@ -1,8 +1,10 @@
 #!/bin/sh
 # Supervise the backfill: restart on transient fetch failures (exit 1),
 # never on parse failures (exit 2). Cache makes each restart resume fast.
+# Usage: ./backfill.sh [N_SEASONS]  (default 5)
+SEASONS="${1:-5}"
 for attempt in 1 2 3 4 5; do
-    .venv/bin/python -u -m scraper.run --backfill 5
+    .venv/bin/python -u -m scraper.run --backfill "$SEASONS"
     code=$?
     [ $code -eq 0 ] && echo "backfill complete" && exit 0
     [ $code -eq 2 ] && echo "parse failure — stopping, fix the parser" && exit 2
