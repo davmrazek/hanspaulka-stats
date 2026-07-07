@@ -6,6 +6,7 @@
   <span class="badge">Forma: <span class="form">{% for c in form %}<b class="f-{{ c }}">{{ c }}</b>{% endfor %}</span></span>
   <span class="badge">Bez porážky: {{ unbeaten.current }} (rekord {{ unbeaten.longest }})</span>
   <span class="badge">Zápasů v databázi: {{ matches | length }}</span>
+  <span class="badge">Karty: <b class="card-y">{{ discipline.yellow }}</b> <b class="card-r">{{ discipline.red }}</b></span>
 </div>
 
 <h2>Historie sezón</h2>
@@ -49,12 +50,24 @@
 </div>
 </div>
 
-<h2>Nejlepší střelci týmu</h2>
-<ol class="scorers">
-  {% for name, goals in scorers %}
-  <li>{{ name }} — {{ goals }}</li>
+<h2>Hráči (všechny sezóny)</h2>
+<div class="scroll-x">
+<table class="roster">
+  <tr><th>Hráč</th><th>Zápasy</th><th>V bráně</th><th>Góly</th><th>ŽK</th><th>ČK</th><th>Hvězda zápasu</th><th>Kapitán</th></tr>
+  {% for p in roster %}
+  <tr>
+    <td>{{ p.name }}</td>
+    <td>{{ p.apps }}</td>
+    <td>{{ p.gk_apps or '' }}</td>
+    <td>{% if p.goals %}<strong>{{ p.goals }}</strong>{% endif %}</td>
+    <td>{{ p.yellow or '' }}</td>
+    <td>{{ p.red or '' }}</td>
+    <td>{{ p.best or '' }}</td>
+    <td>{{ p.captain or '' }}</td>
+  </tr>
   {% endfor %}
-</ol>
+</table>
+</div>
 
 <h2>Poslední zápasy</h2>
 <table class="results">

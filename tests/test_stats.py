@@ -131,6 +131,37 @@ def test_export_referee_csvs(conn, tmp_path):
         assert f.exists() and f.read_text(encoding="utf-8").count("\n") >= 1
 
 
+def test_team_roster_and_discipline(conn):
+    tid, _ = stats.find_team(conn, "Power Rangers")
+    roster = stats.team_roster(conn, tid)
+    assert roster, "roster should not be empty"
+    kocourek = next(p for p in roster if p["name"] == "Michal Kocourek")
+    assert kocourek["goals"] >= 2          # scored twice in round 11
+    assert kocourek["yellow"] == 1         # carded in round 4
+    trojan = next(p for p in roster if p["name"] == "Adam Trojan")
+    assert trojan["gk_apps"] >= 1          # goalkeeper in round 11
+    novansky = next(p for p in roster if p["name"] == "Pavel Novanský")
+    assert novansky["best"] >= 1 and novansky["captain"] >= 1
+
+    disc = stats.team_discipline(conn, tid)
+    assert disc["yellow"] >= 1 and disc["red"] == 0
+
+
+def test_group_fairplay(conn):
+    group_id = conn.execute("SELECT id FROM groups").fetchone()[0]
+    fp = stats.group_fairplay(conn, group_id)
+    assert fp, "round 4 fixture has yellow cards"
+    assert all(rc == 0 for _, _, rc in fp)  # no reds in fixtures
+    totals = sum(yc for _, yc, _ in fp)
+    assert totals == conn.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
+
+
+def test_team_cards_by_season(conn):
+    tid, _ = stats.find_team(conn, "Power Rangers")
+    by_season = stats.team_cards_by_season(conn, tid)
+    assert by_season.get("2025-podzim", {}).get("yellow", 0) >= 1
+
+
 # --- verification against the real backfilled DB -------------------------------
 
 

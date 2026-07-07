@@ -175,6 +175,80 @@ def head_to_head(conn, team_id: int, opp_id: int) -> dict:
     }
 
 
+def team_roster(conn, team_id: int) -> list[dict]:
+    """Per player: appearances, goalkeeper apps, goals, cards, best-player
+    and captain counts. Players are scoped per team (no cross-team identity)."""
+    rows = conn.execute(
+        """
+        SELECT p.name,
+               (SELECT COUNT(*) FROM appearances a WHERE a.player_id = p.id) AS apps,
+               (SELECT COUNT(*) FROM appearances a
+                 WHERE a.player_id = p.id AND a.role = 'goalkeeper') AS gk_apps,
+               (SELECT COUNT(*) FROM goals g
+                 WHERE g.player_id = p.id AND g.own_goal = 0) AS goals,
+               (SELECT COUNT(*) FROM cards c
+                 WHERE c.player_id = p.id AND c.color = 'yellow') AS yellow,
+               (SELECT COUNT(*) FROM cards c
+                 WHERE c.player_id = p.id AND c.color = 'red') AS red,
+               (SELECT COUNT(*) FROM appearances a
+                 WHERE a.player_id = p.id AND a.is_best = 1) AS best,
+               (SELECT COUNT(*) FROM appearances a
+                 WHERE a.player_id = p.id AND a.is_captain = 1) AS captain
+        FROM players p
+        WHERE p.team_id = ?
+        ORDER BY apps DESC, goals DESC, p.name
+        """,
+        (team_id,),
+    ).fetchall()
+    keys = ("name", "apps", "gk_apps", "goals", "yellow", "red", "best", "captain")
+    return [dict(zip(keys, r)) for r in rows if r[1] > 0 or r[3] > 0]
+
+
+def team_discipline(conn, team_id: int) -> dict[str, int]:
+    """All-time card totals for a team."""
+    rows = dict(conn.execute(
+        "SELECT color, COUNT(*) FROM cards WHERE team_id = ? GROUP BY color",
+        (team_id,),
+    ))
+    return {"yellow": rows.get("yellow", 0), "red": rows.get("red", 0)}
+
+
+def group_fairplay(conn, group_id: int) -> list[tuple[str, int, int]]:
+    """(team, yellows, reds) within one group, most-carded first."""
+    return conn.execute(
+        """
+        SELECT t.name,
+               SUM(c.color = 'yellow') AS yc,
+               SUM(c.color = 'red') AS rc
+        FROM cards c
+        JOIN matches m ON m.id = c.match_id
+        JOIN teams t ON t.id = c.team_id
+        WHERE m.group_id = ?
+        GROUP BY c.team_id ORDER BY yc + 2 * rc DESC, t.name
+        """,
+        (group_id,),
+    ).fetchall()
+
+
+def team_cards_by_season(conn, team_id: int) -> dict[str, dict[str, int]]:
+    """{season: {yellow, red}} for one team."""
+    out: dict[str, dict[str, int]] = {}
+    for season, color, n in conn.execute(
+        """
+        SELECT s.year || '-' || s.half, c.color, COUNT(*)
+        FROM cards c
+        JOIN matches m ON m.id = c.match_id
+        JOIN groups g ON g.id = m.group_id
+        JOIN seasons s ON s.id = g.season_id
+        WHERE c.team_id = ?
+        GROUP BY s.id, c.color
+        """,
+        (team_id,),
+    ):
+        out.setdefault(season, {"yellow": 0, "red": 0})[color] = n
+    return out
+
+
 def team_top_scorers(conn, team_id: int, limit: int = 5) -> list[tuple[str, int]]:
     return conn.execute(
         """

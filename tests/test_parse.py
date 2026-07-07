@@ -173,6 +173,18 @@ def test_piskani_page():
 # --- failure modes -----------------------------------------------------------
 
 
+def test_group_page_without_results_endpoints_is_ok():
+    # cancelled seasons (COVID 2020-jaro) have cmd=games but no cmd=results
+    html = """<html><body><h1>Hanspaulská liga 1A</h1>
+      <a href="#" data-url="/souteze/x/1-a/?cmd=games&type=old&round=1"></a>
+      <table class="tables-table"><tr><th>h</th></tr>
+      <tr><td>1.</td><td>Tým</td><td>0</td><td>0</td><td>0</td><td>0</td>
+      <td>0:0</td><td>0</td></tr></table></body></html>"""
+    page = parse.parse_group_page(html)
+    assert page.results_urls == {}
+    assert page.standings[0].played == 0
+
+
 def test_piskani_empty_rozpis_is_ok():
     # top tiers have PSMF referees, no duty rozpis (e.g. 2026-jaro 1-A)
     html = "<html><body><h2>Rozpis pískání</h2><p>Nenalezen žádná záznam.</p></body></html>"

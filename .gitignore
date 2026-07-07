@@ -28,3 +28,6 @@ __pycache__/
 
 # local logs
 *.log
+
+# markdown docs (local planning notes; already-tracked .md files are unaffected)
+*.md

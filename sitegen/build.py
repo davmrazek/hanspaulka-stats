@@ -51,6 +51,8 @@ def load_seasons(conn) -> list[dict]:
 
 
 def load_groups(conn) -> list[dict]:
+    """Groups that actually have data — cancelled seasons (COVID 2020-jaro)
+    leave empty group rows behind; those get no pages."""
     return [
         {
             "id": r[0], "season_slug": r[1], "tier": r[2], "letter": r[3],
@@ -61,6 +63,8 @@ def load_groups(conn) -> list[dict]:
             """
             SELECT g.id, s.slug, g.tier, g.letter
             FROM groups g JOIN seasons s ON s.id = g.season_id
+            WHERE EXISTS (SELECT 1 FROM standings st WHERE st.group_id = g.id)
+               OR EXISTS (SELECT 1 FROM matches m WHERE m.group_id = g.id)
             """
         )
     ]
@@ -161,6 +165,7 @@ def group_context(conn, group: dict, teams_by_name: dict) -> dict:
         "cross_teams": [r["team"] for r in table],
         "chart_json": json.dumps(chart, ensure_ascii=False),
         "scorers": scorers,
+        "fairplay": stats.group_fairplay(conn, group["id"]),
         "deductions": stats.point_deductions(conn, group["id"]),
     }
 
@@ -173,6 +178,7 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
     goals_by_season: dict[str, list[int]] = defaultdict(list)
     for m in matches:
         goals_by_season[m.season].append(m.gf)
+    cards_by_season = stats.team_cards_by_season(conn, team["id"])
     trend = {
         "seasons": [h["season"] for h in history],
         "avg_goals": [
@@ -180,6 +186,10 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
             if goals_by_season[h["season"]] else 0
             for h in history
         ],
+        "yellow": [cards_by_season.get(h["season"], {}).get("yellow", 0)
+                   for h in history],
+        "red": [cards_by_season.get(h["season"], {}).get("red", 0)
+                for h in history],
     }
     return {
         "team": team,
@@ -196,6 +206,8 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
         "biggest_losses": losses,
         "unbeaten": {"longest": longest, "current": current},
         "scorers": stats.team_top_scorers(conn, team["id"], limit=10),
+        "roster": stats.team_roster(conn, team["id"]),
+        "discipline": stats.team_discipline(conn, team["id"]),
         "trend_json": json.dumps(trend, ensure_ascii=False),
     }
 
@@ -274,8 +286,9 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
             shutil.rmtree(child) if child.is_dir() else child.unlink()
     out.mkdir(parents=True, exist_ok=True)
 
-    seasons = load_seasons(conn)
     groups = load_groups(conn)
+    populated = {g["season_slug"] for g in groups}
+    seasons = [s for s in load_seasons(conn) if s["slug"] in populated]
     teams = load_teams(conn)
     teams_by_name = {t["name"]: t for t in teams}
     groups_by_id = {g["id"]: g for g in groups}
@@ -314,21 +327,69 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
     )
 
     for g in groups:
+        ctx = group_context(conn, g, teams_by_name)
         render(
             "group.html", g["url"],
-            **group_context(conn, g, teams_by_name),
+            **ctx,
             title=f"Skupina {g['name']} {g['season_slug']} — {SITE_NAME}",
             description=f"Výsledky, tabulka a střelci skupiny {g['name']} "
                         f"Hanspaulské ligy {g['season_slug']}.",
         )
+        (out / g["url"].lstrip("/") / "data.json").write_text(
+            json.dumps({
+                "label": f"{g['season_slug']} {g['name']}",
+                "url": f"{base_url}{g['url']}",
+                "table": [
+                    {"position": r["position"], "team": r["team"],
+                     "played": r["played"], "points": r["points"],
+                     "gf": r["gf"], "ga": r["ga"]}
+                    for r in ctx["table"]
+                ],
+                "scorers": [
+                    {"name": n, "team": t2, "goals": goals}
+                    for n, t2, goals in ctx["scorers"]
+                ],
+                "fairplay": [
+                    {"team": t2, "yellow": yc, "red": rc}
+                    for t2, yc, rc in ctx["fairplay"]
+                ],
+            }, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
     for t in teams:
+        ctx = team_context(conn, t, groups_by_id, teams_by_name)
         render(
             "team.html", t["url"],
-            **team_context(conn, t, groups_by_id, teams_by_name),
+            **ctx,
             title=f"{t['name']} — statistiky týmu — {SITE_NAME}",
             description=f"Historie, forma a výsledky týmu {t['name']} "
                         f"v Hanspaulské lize.",
+        )
+        # compact per-team JSON consumed by the customizable homepage
+        (out / t["url"].lstrip("/") / "data.json").write_text(
+            json.dumps({
+                "name": t["name"],
+                "url": f"{base_url}{t['url']}",
+                "form": ctx["form"],
+                "history": ctx["history"],
+                "trend": json.loads(ctx["trend_json"]),
+                "recent": [
+                    {"date": m["date"], "opponent": m["opponent"],
+                     "venue": m["venue"], "gf": m["gf"], "ga": m["ga"],
+                     "outcome": m["outcome"]}
+                    for m in ctx["recent"][:5]
+                ],
+                "split": ctx["split"],
+                "unbeaten": ctx["unbeaten"],
+                "discipline": ctx["discipline"],
+                "roster": ctx["roster"][:8],
+                "biggest_win": ({"opponent": w.opponent, "gf": w.gf, "ga": w.ga,
+                                 "season": w.season}
+                                if (w := (ctx["biggest_wins"][0] if ctx["biggest_wins"] else None))
+                                else None),
+            }, ensure_ascii=False),
+            encoding="utf-8",
         )
 
     render(
@@ -347,7 +408,21 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         ),
         encoding="utf-8",
     )
-    for asset in ("style.css", "app.js"):
+    (out / "groups.json").write_text(
+        json.dumps(
+            [
+                {"l": f"{g['season_slug']} {g['name']}", "u": f"{base_url}{g['url']}"}
+                for g in sorted(
+                    groups,
+                    key=lambda g: (g["season_slug"] != latest_season,
+                                   g["season_slug"], g["tier"], g["letter"]),
+                )
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    for asset in ("style.css", "app.js", "home.js"):
         shutil.copy(TEMPLATES / asset, out / asset)
 
     # sitemap (absolute URLs need a real origin; base_url may be a bare path)

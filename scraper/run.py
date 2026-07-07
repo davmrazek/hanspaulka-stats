@@ -116,6 +116,17 @@ def discover_seasons(count: int, *, start: tuple[int, str] | None = None,
 def scrape_group(conn, group_id: int, group_url: str, *, force: bool = False) -> None:
     page = parse.parse_group_page(fetch.get(group_url, force=force))
 
+    if not page.results_urls:
+        if all(r.played == 0 for r in page.standings):
+            # cancelled season (e.g. COVID 2020-jaro): schedule exists but
+            # nothing was played and no detail records — store nothing
+            print(f"  skipping {group_url}: season cancelled, 0 matches played")
+            return
+        # played matches but no detail endpoints — unknown legacy layout;
+        # store standings + piskani so the season isn't lost, but say so
+        print(f"  WARNING {group_url}: no results endpoints, "
+              "storing standings only", file=sys.stderr)
+
     for round_ in sorted(page.results_urls):
         url = BASE + page.results_urls[round_]
         payload = json.loads(fetch.get(url, force=force))

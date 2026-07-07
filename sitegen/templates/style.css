@@ -111,6 +111,14 @@ ol.scorers, ol { background: transparent; }
 .f-W { background: var(--win); }
 .f-D { background: var(--draw); }
 .f-L { background: var(--loss); }
+.card-y, .card-r {
+  display: inline-block; min-width: 1.2rem; text-align: center;
+  border-radius: 3px; padding: 0 .25rem; font-size: .8rem; color: #2b2b2b;
+}
+.card-y { background: var(--primary); }
+.card-r { background: var(--loss); color: #fff; }
+.roster td:nth-child(n+2), .roster th:nth-child(n+2),
+.fairplay td:nth-child(n+2), .fairplay th:nth-child(n+2) { text-align: center; }
 b.f-W, b.f-D, b.f-L { color: #fff; padding: 0 .25rem; border-radius: 3px; font-size: .8rem; }
 
 .group-list { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; padding: 0; }
@@ -125,6 +133,68 @@ details summary h2 { display: inline-block; border: none; padding-left: 0; }
 
 .two-col { display: grid; gap: 0 2rem; }
 @media (min-width: 40rem) { .two-col { grid-template-columns: 1fr 1fr; } }
+
+/* customizable homepage: tabs, cards, chips, pickers */
+.tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin: 1rem 0; border-bottom: 2px solid var(--border); }
+.tabs button {
+  font-family: Anton, Arial, sans-serif; font-weight: 400; font-synthesis: none;
+  text-transform: uppercase; letter-spacing: .02em; font-size: .95rem;
+  background: var(--card); color: var(--foreground);
+  border: 1px solid var(--border); border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: .45rem .9rem; cursor: pointer;
+}
+.tabs button.active { background: var(--primary); border-color: var(--primary); }
+.tabs button:hover { background: var(--primary); }
+
+.cards { display: grid; gap: 1rem; margin: 1rem 0; }
+@media (min-width: 40rem) { .cards { grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); } }
+.card {
+  position: relative; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .8rem 1rem;
+}
+.card h3 { margin: 0 0 .3rem; color: var(--foreground); }
+.card table { border: none; background: transparent; }
+.card-x {
+  position: absolute; top: .4rem; right: .5rem;
+  background: transparent; border: none; font-size: 1.1rem; line-height: 1;
+  color: var(--muted-foreground); cursor: pointer; padding: .2rem;
+}
+.card-x:hover { color: var(--loss); }
+
+.picker { position: relative; max-width: 22rem; margin: .5rem 0; }
+.picker input, .chart-controls select, .widget-add select {
+  width: 100%; padding: .45rem .7rem; border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: .95rem; font-family: inherit;
+  background: var(--card); color: var(--foreground);
+}
+.picker input:focus { outline: 2px solid var(--primary); }
+.suggest {
+  position: absolute; z-index: 10; left: 0; right: 0; margin: .25rem 0 0;
+  padding: 0; list-style: none; background: var(--card);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  max-height: 14rem; overflow-y: auto;
+  box-shadow: 0 6px 16px rgb(0 0 0 / .18);
+}
+.suggest li { padding: .35rem .6rem; cursor: pointer; }
+.suggest li:hover { background: var(--primary); }
+
+.chart-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+.chart-controls label { font-size: .9rem; color: var(--muted-foreground); }
+.chart-controls select { width: auto; }
+.widget-add { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+.widget-add select { width: auto; }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .6rem 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 999px; padding: .15rem .3rem .15rem .7rem; font-size: .88rem;
+}
+.chip button {
+  background: transparent; border: none; cursor: pointer; font-size: 1rem;
+  line-height: 1; color: var(--muted-foreground); padding: 0 .3rem;
+}
+.chip button:hover { color: var(--loss); }
 
 .site-footer {
   border-top: 1px solid var(--border); background: var(--card);

@@ -44,6 +44,16 @@
   {% endfor %}
 </ol>
 
+{% if fairplay %}
+<h2>Fair play (karty)</h2>
+<table class="fairplay">
+  <tr><th>Tým</th><th>ŽK</th><th>ČK</th></tr>
+  {% for team, yc, rc in fairplay %}
+  <tr><td>{{ team }}</td><td>{{ yc }}</td><td>{{ rc }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
 <h2>Výsledky po kolech</h2>
 {% for round, matches in rounds.items() %}
 <h3>{{ round }}. kolo</h3>

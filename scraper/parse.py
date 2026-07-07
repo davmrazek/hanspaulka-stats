@@ -394,6 +394,7 @@ def parse_group_page(html: str) -> GroupPage:
 
     results_urls: dict[int, str] = {}
     tables_urls: dict[str, str] = {}
+    has_games = False
     for a in soup.find_all(attrs={"data-url": True}):
         url = a["data-url"]
         query = parse_qs(urlparse(url).query)
@@ -402,8 +403,13 @@ def parse_group_page(html: str) -> GroupPage:
             results_urls[int(query["round"][0])] = url
         elif cmd == "tables" and "type" in query:
             tables_urls[query["type"][0]] = url
-    if not results_urls:
-        raise ParseError("group page: no cmd=results round URLs found")
+        elif cmd == "games":
+            has_games = True
+    if not results_urls and not has_games:
+        # neither modern results endpoints nor a games schedule — this is a
+        # redesign, not a data gap (cancelled seasons like 2020-jaro still
+        # expose cmd=games)
+        raise ParseError("group page: no cmd=results/cmd=games URLs found")
 
     standings_table = soup.find("table", class_="tables-table")
     if standings_table is None:
