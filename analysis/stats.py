@@ -438,6 +438,142 @@ def all_time_scorers(conn, limit: int = 20) -> list[tuple[str, str, int]]:
     ).fetchall()
 
 
+def season_goals_per_round(conn, season_slug: str) -> list[dict]:
+    """League-wide scoring trend: [{round, matches, goals, avg}] per round."""
+    return [
+        {"round": r, "matches": n, "goals": g, "avg": round(g / n, 2)}
+        for r, n, g in conn.execute(
+            """
+            SELECT m.round, COUNT(*), SUM(m.home_goals + m.away_goals)
+            FROM matches m
+            JOIN groups g ON g.id = m.group_id
+            JOIN seasons s ON s.id = g.season_id
+            WHERE s.year || '-' || s.half = ? AND m.home_goals IS NOT NULL
+            GROUP BY m.round ORDER BY m.round
+            """,
+            (season_slug,),
+        )
+    ]
+
+
+def season_movers(conn, prev_slug: str, season_slug: str) -> list[dict]:
+    """Teams whose tier changed between two seasons (postup/sestup arrows).
+    [{team, from_tier, to_tier, up}] ordered by new tier."""
+    def tiers(slug: str) -> dict[str, int]:
+        return dict(conn.execute(
+            """
+            SELECT t.name, MIN(g.tier)
+            FROM standings st
+            JOIN teams t ON t.id = st.team_id
+            JOIN groups g ON g.id = st.group_id
+            JOIN seasons s ON s.id = g.season_id
+            WHERE s.year || '-' || s.half = ?
+            GROUP BY st.team_id
+            """,
+            (slug,),
+        ))
+
+    before, after = tiers(prev_slug), tiers(season_slug)
+    movers = [
+        {"team": team, "from_tier": before[team], "to_tier": tier,
+         "up": tier < before[team]}
+        for team, tier in after.items()
+        if team in before and before[team] != tier
+    ]
+    movers.sort(key=lambda m: (m["to_tier"], m["from_tier"], m["team"]))
+    return movers
+
+
+def _season_standings(conn, season_slug: str) -> list[tuple]:
+    """(team, tier, letter, played, gf, ga) from every group of a season,
+    preferring vysledna standings where published."""
+    return conn.execute(
+        """
+        SELECT t.name, g.tier, g.letter, st.played, st.gf, st.ga
+        FROM standings st
+        JOIN groups g ON g.id = st.group_id
+        JOIN seasons s ON s.id = g.season_id
+        JOIN teams t ON t.id = st.team_id
+        WHERE s.year || '-' || s.half = ?
+          AND st.kind = CASE WHEN EXISTS (
+                SELECT 1 FROM standings x
+                WHERE x.group_id = st.group_id AND x.kind = 'vysledna')
+              THEN 'vysledna' ELSE 'prubezna' END
+        """,
+        (season_slug,),
+    ).fetchall()
+
+
+def season_team_boards(conn, season_slug: str, limit: int = 10,
+                       min_played: int = 5) -> dict[str, list[dict]]:
+    """Best attack (most goals scored) and best defense (fewest conceded)
+    across a season; min_played keeps early-season tables honest."""
+    rows = [
+        {"team": r[0], "group": f"{r[1]}-{r[2].upper()}",
+         "group_url": f"/skupina/{season_slug}/{r[1]}-{r[2]}/",
+         "played": r[3], "gf": r[4], "ga": r[5]}
+        for r in _season_standings(conn, season_slug)
+        if r[3] >= min_played
+    ]
+    return {
+        "attack": sorted(rows, key=lambda r: (-r["gf"], r["team"]))[:limit],
+        "defense": sorted(rows, key=lambda r: (r["ga"], r["team"]))[:limit],
+    }
+
+
+def season_scorers(conn, season_slug: str, limit: int = 20) -> list[tuple[str, str, int]]:
+    """(player, team, goals) within one season."""
+    return conn.execute(
+        """
+        SELECT p.name, t.name, COUNT(*) AS goals
+        FROM goals gl
+        JOIN matches m ON m.id = gl.match_id
+        JOIN groups g ON g.id = m.group_id
+        JOIN seasons s ON s.id = g.season_id
+        JOIN players p ON p.id = gl.player_id
+        JOIN teams t ON t.id = gl.team_id
+        WHERE s.year || '-' || s.half = ? AND gl.own_goal = 0
+        GROUP BY p.id ORDER BY goals DESC, p.name LIMIT ?
+        """,
+        (season_slug, limit),
+    ).fetchall()
+
+
+def season_fairplay(conn, season_slug: str, limit: int = 20,
+                    min_played: int = 5) -> list[dict]:
+    """Fewest cards per team in one season; card-free teams included.
+    Neutral team-level stat only (see CLAUDE.md)."""
+    cards = {
+        team: (yc, rc)
+        for team, yc, rc in conn.execute(
+            """
+            SELECT t.name,
+                   SUM(c.color = 'yellow') AS yc,
+                   SUM(c.color = 'red') AS rc
+            FROM cards c
+            JOIN matches m ON m.id = c.match_id
+            JOIN groups g ON g.id = m.group_id
+            JOIN seasons s ON s.id = g.season_id
+            JOIN teams t ON t.id = c.team_id
+            WHERE s.year || '-' || s.half = ?
+            GROUP BY c.team_id
+            """,
+            (season_slug,),
+        )
+    }
+    rows = [
+        {"team": r[0], "group": f"{r[1]}-{r[2].upper()}",
+         "group_url": f"/skupina/{season_slug}/{r[1]}-{r[2]}/",
+         "played": r[3],
+         "yellow": cards.get(r[0], (0, 0))[0],
+         "red": cards.get(r[0], (0, 0))[1]}
+        for r in _season_standings(conn, season_slug)
+        if r[3] >= min_played
+    ]
+    rows.sort(key=lambda r: (r["yellow"] + 2 * r["red"], r["team"]))
+    return rows[:limit]
+
+
 def most_improved(conn, season_a: str, season_b: str, limit: int = 10) -> list[dict]:
     """Teams with the biggest climb from season_a to season_b.
     Score = tier drop * 100 + position gain (tiers matter much more)."""

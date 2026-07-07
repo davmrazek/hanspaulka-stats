@@ -34,6 +34,31 @@ DEFAULT_OUT = Path(__file__).resolve().parent.parent / "site"
 SITE_NAME = "Hanspaulka Stats"
 
 
+def spark_svg(matches: list[dict]) -> str:
+    """Inline SVG sparkline: one goal-difference bar per match (chronological),
+    W/D/L colored via .s-* classes. Server-rendered — zero JS on the client."""
+    if not matches:
+        return ""
+    from html import escape
+    mid, bars = 12, []
+    for i, m in enumerate(matches):
+        d = m["gf"] - m["ga"]
+        cls = "s-W" if d > 0 else ("s-D" if d == 0 else "s-L")
+        h = min(abs(d), 5) * 2 or 2
+        y = mid - h if d > 0 else (mid - 1 if d == 0 else mid)
+        title = escape(f"{m['date']} {m['opponent']} {m['gf']}:{m['ga']}")
+        bars.append(
+            f'<rect class="{cls}" x="{i * 8 + 1}" y="{y}" width="6" height="{h}">'
+            f"<title>{title}</title></rect>"
+        )
+    w = len(matches) * 8
+    return (
+        f'<svg class="spark" width="{w}" height="24" viewBox="0 0 {w} 24" '
+        f'role="img" aria-label="Posledních {len(matches)} zápasů">'
+        f'<line x1="0" y1="{mid}" x2="{w}" y2="{mid}"/>{"".join(bars)}</svg>'
+    )
+
+
 def slugify(name: str) -> str:
     text = unicodedata.normalize("NFKD", name)
     text = "".join(c for c in text if not unicodedata.combining(c))
@@ -123,6 +148,10 @@ def group_context(conn, group: dict, teams_by_name: dict) -> dict:
         """,
         (group["id"],),
     ).fetchall()
+    played = [r for r in matches if r[4] is not None]
+    headline = max(
+        played, key=lambda r: (abs(r[4] - r[5]), r[4] + r[5]), default=None
+    )
     rounds: dict[int, list] = defaultdict(list)
     for r in matches:
         rounds[r[0]].append({
@@ -160,6 +189,11 @@ def group_context(conn, group: dict, teams_by_name: dict) -> dict:
         "group": group,
         "kind": kind,
         "table": table,
+        "headline": (
+            {"home": headline[2], "away": headline[3],
+             "score": f"{headline[4]}:{headline[5]}"}
+            if headline else None
+        ),
         "rounds": dict(sorted(rounds.items())),
         "cross": stats.cross_table(conn, group["id"]),
         "cross_teams": [r["team"] for r in table],
@@ -191,14 +225,30 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
         "red": [cards_by_season.get(h["season"], {}).get("red", 0)
                 for h in history],
     }
+    def match_row(m):
+        return {**m.__dict__, "outcome": m.outcome,
+                "opponent_url": teams_by_name.get(m.opponent, {}).get("url")}
+
+    by_season: dict[str, list] = defaultdict(list)
+    for m in matches:
+        by_season[m.season].append(m)
+    matches_by_season = [
+        (season, [match_row(m) for m in reversed(ms)])
+        for season, ms in sorted(
+            by_season.items(),
+            key=lambda kv: stats.season_sort_key(
+                int(kv[0].split("-")[0]), kv[0].split("-")[1]),
+            reverse=True,
+        )
+    ]
+
+    recent = [match_row(m) for m in matches[-10:]][::-1]
     return {
         "team": team,
         "matches": matches,
-        "recent": [
-            {**m.__dict__, "outcome": m.outcome,
-             "opponent_url": teams_by_name.get(m.opponent, {}).get("url")}
-            for m in matches[-10:]
-        ][::-1],
+        "matches_by_season": matches_by_season,
+        "recent": recent,
+        "spark": spark_svg(recent[::-1]),
         "history": history,
         "form": stats.form(matches),
         "split": stats.home_away_split(matches),
@@ -372,6 +422,7 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
                 "name": t["name"],
                 "url": f"{base_url}{t['url']}",
                 "form": ctx["form"],
+                "spark": ctx["spark"],
                 "history": ctx["history"],
                 "trend": json.loads(ctx["trend_json"]),
                 "recent": [
@@ -395,10 +446,45 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
     render(
         "records.html", "/rekordy/",
         **records_context(conn, teams_by_name),
+        seasons=seasons[::-1],
         title=f"Rekordy všech dob — {SITE_NAME}",
         description="Nejlepší střelci, nejdelší série bez porážky a "
                     "nejvyšší výhry v historii Hanspaulské ligy.",
     )
+
+    # season hubs + per-season records (seasons is chronological)
+    prev = None
+    for s in seasons:
+        movers = stats.season_movers(conn, prev["slug"], s["slug"]) if prev else []
+        for mv in movers:
+            mv["url"] = teams_by_name.get(mv["team"], {}).get("url")
+        gpr = stats.season_goals_per_round(conn, s["slug"])
+        chart = {"rounds": [r["round"] for r in gpr],
+                 "avg": [r["avg"] for r in gpr]}
+        render(
+            "season.html", f"/sezona/{s['slug']}/",
+            season=s,
+            groups=season_groups[s["slug"]],
+            pyramid=stats.tier_pyramid(conn, s["slug"]),
+            movers=movers,
+            chart=chart,
+            chart_json=json.dumps(chart, ensure_ascii=False),
+            title=f"Sezóna {s['slug']} — {SITE_NAME}",
+            description=f"Skupiny, postupy a sestupy a rekordy sezóny "
+                        f"{s['slug']} Hanspaulské ligy.",
+        )
+        render(
+            "season_records.html", f"/rekordy/{s['slug']}/",
+            season=s,
+            scorers=stats.season_scorers(conn, s["slug"]),
+            boards=stats.season_team_boards(conn, s["slug"]),
+            fairplay=stats.season_fairplay(conn, s["slug"]),
+            teams_by_name=teams_by_name,
+            title=f"Rekordy sezóny {s['slug']} — {SITE_NAME}",
+            description=f"Nejlepší střelci, útok, obrana a fair play "
+                        f"sezóny {s['slug']} Hanspaulské ligy.",
+        )
+        prev = s
 
     # search index + static assets
     (out / "teams.json").write_text(
@@ -422,7 +508,7 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         ),
         encoding="utf-8",
     )
-    for asset in ("style.css", "app.js", "home.js"):
+    for asset in ("style.css", "app.js", "home.js", "tabs.js", "sort.js"):
         shutil.copy(TEMPLATES / asset, out / asset)
 
     # sitemap (absolute URLs need a real origin; base_url may be a bare path)

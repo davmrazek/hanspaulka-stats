@@ -129,6 +129,15 @@ CREATE TABLE IF NOT EXISTS standings(
     points INTEGER NOT NULL,
     UNIQUE(group_id, team_id, kind)
 );
+CREATE INDEX IF NOT EXISTS idx_matches_home ON matches(home_team_id);
+CREATE INDEX IF NOT EXISTS idx_matches_away ON matches(away_team_id);
+CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
+CREATE INDEX IF NOT EXISTS idx_goals_player ON goals(player_id);
+CREATE INDEX IF NOT EXISTS idx_goals_team ON goals(team_id);
+CREATE INDEX IF NOT EXISTS idx_cards_player ON cards(player_id);
+CREATE INDEX IF NOT EXISTS idx_cards_team ON cards(team_id);
+CREATE INDEX IF NOT EXISTS idx_appearances_player ON appearances(player_id);
+CREATE INDEX IF NOT EXISTS idx_standings_team ON standings(team_id);
 """
 
 
@@ -137,6 +146,9 @@ def connect(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL + timeout: site build reads the DB while the scraper writes
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 10000")
     conn.executescript(SCHEMA)
     return conn
 

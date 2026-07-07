@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<nav class="crumbs">
+  <a href="{{ base }}/">Hanspaulka</a> ›
+  <span>{{ season.slug }}</span>
+</nav>
+<h1>Sezóna {{ season.slug }}</h1>
+<p class="lead"><a href="{{ base }}/rekordy/{{ season.slug }}/">Rekordy sezóny →</a></p>
+
+<h2>Pyramida soutěže</h2>
+<table class="pyramid">
+  <tr><th>Liga</th><th>Skupin</th><th>Týmů</th></tr>
+  {% for row in pyramid %}
+  <tr><td>{{ row.tier }}. liga</td><td>{{ row.groups }}</td><td>{{ row.teams }}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Skupiny</h2>
+{% for tier, gs in groups | groupby("tier") %}
+<h3>{{ tier }}. liga</h3>
+<ul class="group-list">
+  {% for g in gs %}
+  <li><a href="{{ base }}{{ g.url }}">{{ g.name }}</a></li>
+  {% endfor %}
+</ul>
+{% endfor %}
+
+{% set postupy = movers | selectattr("up") | list %}
+{% set sestupy = movers | rejectattr("up") | list %}
+{% if postupy or sestupy %}
+<div class="two-col">
+{% if postupy %}
+<div>
+<h2>Postupy <span class="note">({{ postupy | length }})</span></h2>
+<table class="movers" data-sort>
+  <tr><th>Tým</th><th>Odkud</th><th>Kam</th></tr>
+  {% for m in postupy %}
+  <tr>
+    <td>{% if m.url %}<a href="{{ base }}{{ m.url }}">{{ m.team }}</a>{% else %}{{ m.team }}{% endif %}</td>
+    <td>{{ m.from_tier }}. liga</td>
+    <td><b class="move-up">↑</b> {{ m.to_tier }}. liga</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+{% if sestupy %}
+<div>
+<h2>Sestupy <span class="note">({{ sestupy | length }})</span></h2>
+<table class="movers" data-sort>
+  <tr><th>Tým</th><th>Odkud</th><th>Kam</th></tr>
+  {% for m in sestupy %}
+  <tr>
+    <td>{% if m.url %}<a href="{{ base }}{{ m.url }}">{{ m.team }}</a>{% else %}{{ m.team }}{% endif %}</td>
+    <td>{{ m.from_tier }}. liga</td>
+    <td><b class="move-down">↓</b> {{ m.to_tier }}. liga</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+</div>
+{% endif %}
+
+{% if chart.rounds %}
+<h2>Góly na zápas po kolech (celá liga)</h2>
+<canvas id="goals-chart" height="240"></canvas>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if chart.rounds %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+  const data = {{ chart_json | safe }};
+  new Chart(document.getElementById("goals-chart"), {
+    type: "line",
+    data: {
+      labels: data.rounds.map(r => r + "."),
+      datasets: [{
+        label: "Průměr gólů na zápas",
+        data: data.avg,
+        borderColor: "#fbba00",
+        backgroundColor: "transparent",
+        tension: 0.2,
+      }],
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true } },
+      plugins: { legend: { display: false } },
+    },
+  });
+});
+</script>
+{% endif %}
+{% endblock %}

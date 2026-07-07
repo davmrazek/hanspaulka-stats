@@ -5,35 +5,7 @@
 z veřejných výsledků {{ totals.seasons }} sezón: {{ totals.matches }} zápasů,
 {{ totals.goals }} gólů, {{ totals.teams }} týmů.</p>
 
-<nav class="tabs" id="home-tabs">
-  <button data-tab="prehled" class="active">Přehled</button>
-  <button data-tab="moje-tymy">A · Moje týmy</button>
-  <button data-tab="grafy">B · Grafy</button>
-  <button data-tab="widgety">C · Widgety</button>
-</nav>
-
-<section data-panel="prehled">
-  <h2>Pyramida soutěže ({{ latest_season }})</h2>
-  <table class="pyramid">
-    <tr><th>Liga</th><th>Skupin</th><th>Týmů</th></tr>
-    {% for row in pyramid %}
-    <tr><td>{{ row.tier }}. liga</td><td>{{ row.groups }}</td><td>{{ row.teams }}</td></tr>
-    {% endfor %}
-  </table>
-
-  {% for season in seasons %}
-  <details {% if season.slug == latest_season %}open{% endif %}>
-    <summary><h2>{{ season.slug }}</h2></summary>
-    <ul class="group-list">
-    {% for g in season_groups[season.slug] %}
-      <li><a href="{{ base }}{{ g.url }}">{{ g.name }}</a></li>
-    {% endfor %}
-    </ul>
-  </details>
-  {% endfor %}
-</section>
-
-<section data-panel="moje-tymy" hidden>
+<section id="dashboard">
   <h2>Moje týmy</h2>
   <p class="lead">Sledujte formu a výsledky svých týmů. Výběr se ukládá jen ve vašem prohlížeči.</p>
   <div class="picker">
@@ -41,53 +13,26 @@ z veřejných výsledků {{ totals.seasons }} sezón: {{ totals.matches }} zápa
     <ul id="fav-suggest" class="suggest" hidden></ul>
   </div>
   <div id="fav-cards" class="cards"></div>
-  <p id="fav-empty" class="note">Zatím žádné týmy — začněte hledáním výše.</p>
+  <p id="fav-empty" class="note">Zatím žádné týmy — začněte hledáním výše, nebo si tým přidejte hvězdičkou ★ na jeho stránce.</p>
 </section>
 
-<section data-panel="grafy" hidden>
-  <h2>Vlastní graf</h2>
-  <p class="lead">Porovnejte libovolné týmy napříč sezónami. Nastavení se ukládá jen ve vašem prohlížeči.</p>
-  <div class="chart-controls">
-    <label>Metrika:
-      <select id="chart-metric">
-        <option value="position">Umístění ve skupině</option>
-        <option value="avg_goals">Průměr gólů na zápas</option>
-        <option value="tier">Liga (patro pyramidy)</option>
-        <option value="yellow">Žluté karty za sezónu</option>
-      </select>
-    </label>
-    <div class="picker">
-      <input id="chart-search" type="search" placeholder="Přidat tým do grafu…" autocomplete="off">
-      <ul id="chart-suggest" class="suggest" hidden></ul>
-    </div>
-  </div>
-  <div id="chart-chips" class="chips"></div>
-  <canvas id="custom-chart" height="320" hidden></canvas>
-  <p id="chart-empty" class="note">Přidejte alespoň jeden tým.</p>
-</section>
+<h2>Pyramida soutěže ({{ latest_season }})</h2>
+<table class="pyramid">
+  <tr><th>Liga</th><th>Skupin</th><th>Týmů</th></tr>
+  {% for row in pyramid %}
+  <tr><td>{{ row.tier }}. liga</td><td>{{ row.groups }}</td><td>{{ row.teams }}</td></tr>
+  {% endfor %}
+</table>
 
-<section data-panel="widgety" hidden>
-  <h2>Widgety</h2>
-  <p class="lead">Poskládejte si vlastní přehled. Rozložení se ukládá jen ve vašem prohlížeči.</p>
-  <div class="widget-add">
-    <select id="widget-type">
-      <option value="team-form">Tým — forma a poslední zápasy</option>
-      <option value="group-table">Skupina — tabulka</option>
-      <option value="group-scorers">Skupina — střelci</option>
-      <option value="group-fairplay">Skupina — karty (fair play)</option>
-    </select>
-    <div class="picker">
-      <input id="widget-search" type="search" placeholder="Vybrat tým / skupinu…" autocomplete="off">
-      <ul id="widget-suggest" class="suggest" hidden></ul>
-    </div>
-  </div>
-  <div id="widget-grid" class="cards"></div>
-  <p id="widget-empty" class="note">Zatím žádné widgety.</p>
-</section>
+<h2>Sezóny</h2>
+<ul class="group-list">
+{% for season in seasons %}
+  <li><a href="{{ base }}/sezona/{{ season.slug }}/">{{ season.slug }}</a></li>
+{% endfor %}
+</ul>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 <script>window.HS_BASE = "{{ base }}";</script>
 <script src="{{ base }}/home.js" defer></script>
 {% endblock %}

@@ -146,6 +146,9 @@ details summary h2 { display: inline-block; border: none; padding-left: 0; }
 }
 .tabs button.active { background: var(--primary); border-color: var(--primary); }
 .tabs button:hover { background: var(--primary); }
+/* no-JS fallback: without html.js all panels stay visible, stacked */
+.js [data-panel] { display: none; }
+.js [data-panel].active { display: block; }
 
 .cards { display: grid; gap: 1rem; margin: 1rem 0; }
 @media (min-width: 40rem) { .cards { grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); } }
@@ -202,3 +205,32 @@ details summary h2 { display: inline-block; border: none; padding-left: 0; }
   text-align: center; color: var(--muted-foreground); font-size: .85rem;
 }
 canvas { max-width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem; }
+
+/* sortable tables (sort.js) */
+table[data-sort] th { cursor: pointer; user-select: none; white-space: nowrap; }
+table[data-sort] th::after { content: " ↕"; opacity: .35; font-size: .75em; }
+table[data-sort] th.sort-asc::after { content: " ▲"; opacity: 1; }
+table[data-sort] th.sort-desc::after { content: " ▼"; opacity: 1; }
+
+/* form sparkline (server-rendered inline SVG) */
+.spark { vertical-align: middle; }
+.spark line { stroke: var(--border); stroke-width: 1; }
+.spark .s-W { fill: var(--win); }
+.spark .s-D { fill: var(--draw); }
+.spark .s-L { fill: var(--loss); }
+
+/* breadcrumbs */
+.crumbs { font-size: .85rem; color: var(--muted-foreground); margin-bottom: .3rem; }
+.crumbs a { color: inherit; }
+
+/* ★ favorites toggle */
+#fav-toggle {
+  background: transparent; border: none; cursor: pointer;
+  font-size: 1.4rem; line-height: 1; vertical-align: middle;
+  color: var(--muted-foreground); padding: 0 .2rem;
+}
+#fav-toggle.on, #fav-toggle:hover { color: var(--primary); }
+
+/* season hub movers */
+.move-up { color: var(--win); }
+.move-down { color: var(--loss); }
