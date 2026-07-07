@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<meta name="description" content="{{ description }}">
+<link rel="stylesheet" href="{{ base }}/style.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="logo" href="{{ base }}/">⚽ {{ site_name }}</a>
+  <div class="search">
+    <input id="team-search" type="search" placeholder="Hledat tým…" autocomplete="off"
+           data-index="{{ base }}/teams.json">
+    <ul id="search-results" hidden></ul>
+  </div>
+  <nav>
+    <a href="{{ base }}/rekordy/">Rekordy</a>
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <p>Data pocházejí z veřejných výsledků na <a href="https://www.psmf.cz" rel="noopener">psmf.cz</a>.
+     Neoficiální statistiky, aktualizováno {{ built_at }}.</p>
+  <p>Vytvořil David Mrázek</p>
+</footer>
+<script src="{{ base }}/app.js" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

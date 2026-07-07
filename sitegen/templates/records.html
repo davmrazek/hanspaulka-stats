@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Rekordy všech dob</h1>
+<p class="lead">Napříč všemi sezónami v databázi. Hráčské statistiky se počítají
+na hráče v rámci týmu (stejné jméno v různých týmech = různé záznamy).</p>
+
+<h2>Nejlepší střelci</h2>
+<ol class="scorers">
+  {% for name, team, goals in scorers %}
+  <li>{{ name }} ({{ team }}) — <strong>{{ goals }}</strong></li>
+  {% endfor %}
+</ol>
+
+<h2>Nejdelší série bez porážky</h2>
+<ol>
+  {% for name, run, url in unbeaten %}
+  <li>{% if url %}<a href="{{ base }}{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}
+      — <strong>{{ run }}</strong> zápasů</li>
+  {% endfor %}
+</ol>
+
+<h2>Nejvyšší výhry</h2>
+<table class="results">
+  {% for season, tier, letter, home, away, hg, ag in biggest %}
+  <tr>
+    <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
+    <td>{{ home }} – {{ away }}</td>
+    <td class="score"><strong>{{ hg }}:{{ ag }}</strong></td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Nejvíc gólů v zápase</h2>
+<table class="results">
+  {% for season, tier, letter, home, away, hg, ag in most_goals %}
+  <tr>
+    <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
+    <td>{{ home }} – {{ away }}</td>
+    <td class="score"><strong>{{ hg }}:{{ ag }}</strong></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

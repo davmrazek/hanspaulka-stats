@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ team.name }}</h1>
+
+<div class="badges">
+  <span class="badge">Forma: <span class="form">{% for c in form %}<b class="f-{{ c }}">{{ c }}</b>{% endfor %}</span></span>
+  <span class="badge">Bez porážky: {{ unbeaten.current }} (rekord {{ unbeaten.longest }})</span>
+  <span class="badge">Zápasů v databázi: {{ matches | length }}</span>
+</div>
+
+<h2>Historie sezón</h2>
+<table class="history">
+  <tr><th>Sezóna</th><th>Skupina</th><th>Umístění</th></tr>
+  {% for h in history %}
+  <tr>
+    <td>{{ h.season }}</td>
+    <td>{{ h.group }}</td>
+    <td>{{ h.position }}.{% if not h.final %} <span class="note">(průběžně)</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Průměr vstřelených gólů na zápas</h2>
+<canvas id="trend-chart" height="200"></canvas>
+
+<h2>Doma / venku (všechny sezóny)</h2>
+<table class="splits">
+  <tr><th></th><th>Z</th><th>V</th><th>R</th><th>P</th><th>Skóre</th></tr>
+  <tr><td>Doma</td><td>{{ split.home.P }}</td><td>{{ split.home.W }}</td><td>{{ split.home.D }}</td><td>{{ split.home.L }}</td><td>{{ split.home.GF }}:{{ split.home.GA }}</td></tr>
+  <tr><td>Venku</td><td>{{ split.away.P }}</td><td>{{ split.away.W }}</td><td>{{ split.away.D }}</td><td>{{ split.away.L }}</td><td>{{ split.away.GF }}:{{ split.away.GA }}</td></tr>
+</table>
+
+<div class="two-col">
+<div>
+<h2>Nejvyšší výhry</h2>
+<ul>
+  {% for m in biggest_wins %}
+  <li><strong>{{ m.gf }}:{{ m.ga }}</strong> vs {{ m.opponent }} <span class="note">({{ m.season }})</span></li>
+  {% endfor %}
+</ul>
+</div>
+<div>
+<h2>Nejvyšší porážky</h2>
+<ul>
+  {% for m in biggest_losses %}
+  <li><strong>{{ m.gf }}:{{ m.ga }}</strong> vs {{ m.opponent }} <span class="note">({{ m.season }})</span></li>
+  {% endfor %}
+</ul>
+</div>
+</div>
+
+<h2>Nejlepší střelci týmu</h2>
+<ol class="scorers">
+  {% for name, goals in scorers %}
+  <li>{{ name }} — {{ goals }}</li>
+  {% endfor %}
+</ol>
+
+<h2>Poslední zápasy</h2>
+<table class="results">
+  {% for m in recent %}
+  <tr>
+    <td class="date">{{ m.date }}</td>
+    <td><b class="f-{{ m.outcome }}">{{ m.outcome }}</b></td>
+    <td>{% if m.opponent_url %}<a href="{{ base }}{{ m.opponent_url }}">{{ m.opponent }}</a>{% else %}{{ m.opponent }}{% endif %}
+        <span class="note">({{ 'doma' if m.venue == 'home' else 'venku' }})</span></td>
+    <td class="score">{{ m.gf }}:{{ m.ga }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+  const t = {{ trend_json | safe }};
+  if (!t.seasons.length) return;
+  new Chart(document.getElementById("trend-chart"), {
+    type: "bar",
+    data: {
+      labels: t.seasons,
+      datasets: [{ label: "Průměr gólů / zápas", data: t.avg_goals,
+                   backgroundColor: "hsl(145 60% 40% / .7)" }],
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } },
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Skupina {{ group.name }} · {{ group.season_slug }}</h1>
+
+<h2>{% if kind == 'vysledna' %}Výsledná tabulka{% else %}Průběžná tabulka{% endif %}</h2>
+<table class="standings">
+  <tr><th>#</th><th>Tým</th><th>Z</th><th>V</th><th>R</th><th>P</th><th>Skóre</th><th>B</th></tr>
+  {% for r in table %}
+  <tr>
+    <td>{{ r.position }}.</td>
+    <td>{% if r.team_url %}<a href="{{ base }}{{ r.team_url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
+    <td>{{ r.played }}</td><td>{{ r.won }}</td><td>{{ r.drawn }}</td><td>{{ r.lost }}</td>
+    <td>{{ r.gf }}:{{ r.ga }}</td><td><strong>{{ r.points }}</strong></td>
+  </tr>
+  {% endfor %}
+</table>
+{% if deductions %}
+<p class="note">Tabulka zahrnuje administrativní odečty bodů:
+{% for team, delta in deductions.items() %}{{ team }} ({{ delta }}){% if not loop.last %}, {% endif %}{% endfor %}.</p>
+{% endif %}
+
+<h2>Vývoj pořadí po kolech</h2>
+<canvas id="position-chart" height="320"></canvas>
+
+<h2>Křížová tabulka</h2>
+<div class="scroll-x">
+<table class="cross">
+  <tr><th></th>{% for t in cross_teams %}<th title="{{ t }}">{{ loop.index }}</th>{% endfor %}</tr>
+  {% for home in cross_teams %}
+  <tr>
+    <th>{{ loop.index }}. {{ home }}</th>
+    {% for away in cross_teams %}
+    <td>{% if home == away %}—{% else %}{{ cross.get(home, {}).get(away, '·') }}{% endif %}</td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+</div>
+
+<h2>Střelci</h2>
+<ol class="scorers">
+  {% for name, team, goals in scorers %}
+  <li>{{ name }} ({{ team }}) — {{ goals }}</li>
+  {% endfor %}
+</ol>
+
+<h2>Výsledky po kolech</h2>
+{% for round, matches in rounds.items() %}
+<h3>{{ round }}. kolo</h3>
+<table class="results">
+  {% for m in matches %}
+  <tr>
+    <td class="date">{{ m.date or '' }}</td>
+    <td>{% if m.home_url %}<a href="{{ base }}{{ m.home_url }}">{{ m.home }}</a>{% else %}{{ m.home }}{% endif %}
+        – {% if m.away_url %}<a href="{{ base }}{{ m.away_url }}">{{ m.away }}</a>{% else %}{{ m.away }}{% endif %}</td>
+    <td class="score">{{ m.score }} <span class="ht">{{ m.ht }}</span></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+  const data = {{ chart_json | safe }};
+  if (!data.rounds.length) return;
+  new Chart(document.getElementById("position-chart"), {
+    type: "line",
+    data: {
+      labels: data.rounds.map(r => r + "."),
+      datasets: data.series.map((s, i) => ({
+        label: s.team,
+        data: s.positions,
+        borderColor: `hsl(${(i * 137) % 360} 65% 45%)`,
+        backgroundColor: "transparent",
+        tension: 0.2,
+      })),
+    },
+    options: {
+      responsive: true,
+      scales: { y: { reverse: true, ticks: { stepSize: 1 }, title: { display: true, text: "Pořadí" } } },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
+    },
+  });
+});
+</script>
+{% endblock %}

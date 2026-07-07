@@ -1,18 +1,30 @@
 # Weekly scrape of the current season (results complete by Monday evening,
-# see CLAUDE.md). The DB is published as a rolling release asset, never
-# committed (data/ is gitignored by design).
-name: weekly-scrape
+# see CLAUDE.md), followed by a site rebuild and GitHub Pages deploy.
+# The DB is published as a rolling release asset, never committed
+# (data/ is gitignored by design).
+#
+# On push to master only the site is rebuilt (from the last published DB) —
+# psmf.cz is scraped at most once a week.
+name: scrape-and-deploy
 
 on:
   schedule:
     - cron: "0 4 * * 2" # Tue 04:00 UTC = 06:00 Prague in summer (05:00 in winter)
   workflow_dispatch: {}
+  push:
+    branches: [master]
 
 permissions:
-  contents: write # needed to update the db-latest release
+  contents: write # update the db-latest release
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  scrape:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,9 +44,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Scrape current season
+        if: github.event_name != 'push'
         run: python -m scraper.run --current
 
       - name: Publish DB
+        if: github.event_name != 'push'
         run: |
           gh release view db-latest >/dev/null 2>&1 || \
             gh release create db-latest --title "Latest database" \
@@ -43,9 +57,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Upload run artifact
-        uses: actions/upload-artifact@v4
+      - name: Build site
+        run: python -m sitegen.build --base-url "${{ vars.SITE_BASE_URL || '/hanspaulka-stats' }}"
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: hanspaulka-db
-          path: data/hanspaulka.db
-          retention-days: 30
+          path: site/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Statistiky Hanspaulské ligy</h1>
+<p class="lead">Formy týmů, historické tabulky, střelci a rekordy — spočítané
+z veřejných výsledků {{ totals.seasons }} sezón: {{ totals.matches }} zápasů,
+{{ totals.goals }} gólů, {{ totals.teams }} týmů.</p>
+
+<h2>Pyramida soutěže ({{ latest_season }})</h2>
+<table class="pyramid">
+  <tr><th>Liga</th><th>Skupin</th><th>Týmů</th></tr>
+  {% for row in pyramid %}
+  <tr><td>{{ row.tier }}. liga</td><td>{{ row.groups }}</td><td>{{ row.teams }}</td></tr>
+  {% endfor %}
+</table>
+
+{% for season in seasons %}
+<details {% if season.slug == latest_season %}open{% endif %}>
+  <summary><h2>{{ season.slug }}</h2></summary>
+  <ul class="group-list">
+  {% for g in season_groups[season.slug] %}
+    <li><a href="{{ base }}{{ g.url }}">{{ g.name }}</a></li>
+  {% endfor %}
+  </ul>
+</details>
+{% endfor %}
+{% endblock %}
