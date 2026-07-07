@@ -173,6 +173,12 @@ def test_piskani_page():
 # --- failure modes -----------------------------------------------------------
 
 
+def test_piskani_empty_rozpis_is_ok():
+    # top tiers have PSMF referees, no duty rozpis (e.g. 2026-jaro 1-A)
+    html = "<html><body><h2>Rozpis pískání</h2><p>Nenalezen žádná záznam.</p></body></html>"
+    assert parse.parse_piskani(html) == ()
+
+
 def test_parsers_fail_loudly_on_wrong_page():
     with pytest.raises(parse.ParseError):
         parse.parse_results("<html><body>redesigned</body></html>")

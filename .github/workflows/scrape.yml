@@ -1,0 +1,51 @@
+# Weekly scrape of the current season (results complete by Monday evening,
+# see CLAUDE.md). DB is published as a rolling release asset, never committed
+# (data/ is gitignored by design).
+name: weekly-scrape
+
+on:
+  schedule:
+    - cron: "0 4 * * 2" # Tue 04:00 UTC = 06:00 Prague in summer (05:00 in winter)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # needed to update the db-latest release
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Seed DB from previous run
+        run: |
+          mkdir -p data
+          gh release download db-latest --pattern hanspaulka.db --dir data || echo "no previous DB, starting fresh"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Scrape current season
+        run: python -m scraper.run --current
+
+      - name: Publish DB
+        run: |
+          gh release view db-latest >/dev/null 2>&1 || \
+            gh release create db-latest --title "Latest database" \
+              --notes "Rolling SQLite artifact updated by the weekly scrape." --latest=false
+          gh release upload db-latest data/hanspaulka.db --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Upload run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hanspaulka-db
+          path: data/hanspaulka.db
+          retention-days: 30
