@@ -1,8 +1,16 @@
-# raw HTML cache
+# raw HTML cache (symlink to storage outside iCloud-synced ~/Documents)
+cache
 cache/
 
-# SQLite database
+# SQLite database (symlink, same reason)
+data
 data/
+
+# iCloud sync conflict copies
+* 2.*
+* 2/
+* 3.*
+* 3/
 
 # generated site (keep CNAME if added later)
 site/*
