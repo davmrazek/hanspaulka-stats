@@ -203,6 +203,27 @@ def head_to_head(conn, team_id: int, opp_id: int) -> dict:
     }
 
 
+def build_opponent_aggregates(matches: list[TeamMatch]) -> list[dict]:
+    """Per-opponent head-to-head aggregates from a team's matches, most-played
+    first. Each entry carries W/D/L, GF:GA and the full match list."""
+    agg: dict[str, dict] = {}
+    for m in matches:
+        a = agg.setdefault(m.opponent, {
+            "opponent": m.opponent,
+            "won": 0, "drawn": 0, "lost": 0, "gf": 0, "ga": 0, "matches": []})
+        a["won" if m.outcome == "W" else "drawn" if m.outcome == "D" else "lost"] += 1
+        a["gf"] += m.gf
+        a["ga"] += m.ga
+        a["matches"].append({
+            "date": m.date, "season": m.season, "venue": m.venue,
+            "gf": m.gf, "ga": m.ga, "outcome": m.outcome})
+    rows = list(agg.values())
+    for a in rows:
+        a["played"] = a["won"] + a["drawn"] + a["lost"]
+    rows.sort(key=lambda a: (-a["played"], a["opponent"]))
+    return rows
+
+
 def team_roster(conn, team_id: int) -> list[dict]:
     """Per player: appearances, goalkeeper apps, goals, cards, best-player
     and captain counts. Players are scoped per team (no cross-team identity)."""

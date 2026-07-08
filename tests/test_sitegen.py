@@ -39,8 +39,9 @@ def test_slugify():
 def test_build_renders_all_page_types(db_path, tmp_path):
     out = tmp_path / "site"
     count = build.build(db_path, out, base_url="/prefix")
-    # home + group + 12 teams + records + (season hub + season records) * 1 season
-    assert count == 1 + 1 + 12 + 1 + 2
+    # home + group + 12 teams + records + srovnani
+    #  + (season hub + season records) * 1 season
+    assert count == 1 + 1 + 12 + 1 + 1 + 2
 
     home = (out / "index.html").read_text(encoding="utf-8")
     assert "Pyramida" in home and 'href="/prefix/style.css"' in home
@@ -64,10 +65,11 @@ def test_build_renders_all_page_types(db_path, tmp_path):
     assert "Power Rangers" in team and "Kariéra po sezónách" in team
     # team page is tabbed: five panels incl. Sezóny (#12) and Statistiky (#11)
     assert 'data-tabs' in team
-    for panel in ("prehled", "zapasy", "sezony", "hraci", "statistiky"):
+    for panel in ("prehled", "zapasy", "sezony", "hraci", "statistiky", "h2h"):
         assert f'data-panel="{panel}"' in team
     assert "2025-podzim" in team  # Zápasy season heading
     assert "tier-chart" in team and "cards-chart" in team  # new charts
+    assert 'id="h2h-picker"' in team  # #13 H2H tab
     assert (out / "tabs.js").exists()
     assert (out / "sort.js").exists()
     # S1 components: sparkline, favorites star, breadcrumbs, sortable tables
@@ -79,6 +81,12 @@ def test_build_renders_all_page_types(db_path, tmp_path):
     assert team_json["spark"].startswith("<svg")
     # #11/#12: chart series in team data.json
     assert "avg_conceded" in team_json["trend"] and "tier" in team_json["trend"]
+    # #13: opponent aggregates in team data.json
+    assert team_json["opponents"] and "played" in team_json["opponents"][0]
+    # #14: comparison page + asset
+    srovnani = (out / "srovnani/index.html").read_text(encoding="utf-8")
+    assert 'id="pick-a"' in srovnani and 'id="compare-chart"' in srovnani
+    assert (out / "srovnani.js").exists()
     # #10: group data.json carries prebuilt chart series
     group_json = json.loads(
         (out / "skupina/2025-podzim/6-a/data.json").read_text(encoding="utf-8"))

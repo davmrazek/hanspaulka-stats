@@ -28,6 +28,7 @@
   <button data-tab="sezony">Sezóny</button>
   <button data-tab="hraci">Hráči</button>
   <button data-tab="statistiky">Statistiky</button>
+  <button data-tab="h2h">Vzájemné</button>
 </nav>
 
 <section data-panel="prehled">
@@ -133,10 +134,19 @@
   <h2>Doma / venku (bilance)</h2>
   <canvas id="split-chart" height="220"></canvas>
 </section>
+
+<section data-panel="h2h">
+  <h2>Vzájemné zápasy</h2>
+  <div class="picker">
+    <label>Soupeř: <select id="h2h-picker"><option value="">— vyberte —</option></select></label>
+  </div>
+  <div id="h2h-result"></div>
+</section>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>window.HS_BASE = "{{ base }}"; window.TEAM_SLUG = "{{ team.slug }}";</script>
 <script>
 window.addEventListener("DOMContentLoaded", () => {
   let dataPromise = null;
@@ -213,6 +223,53 @@ window.addEventListener("DOMContentLoaded", () => {
       options: { responsive: true, plugins: { legend: { position: "bottom" } } },
     });
   });
+
+  // H2H tab: opponent picker over prebuilt aggregates, deep-linkable #h2h=slug
+  (function () {
+    const panel = document.querySelector('[data-panel="h2h"]');
+    const picker = document.getElementById("h2h-picker");
+    const result = document.getElementById("h2h-result");
+    const key = (o) => o.slug || o.opponent;
+    const slugFromHash = () => {
+      const h = decodeURIComponent(location.hash.slice(1));
+      return h.startsWith("h2h=") ? h.slice(4) : "";
+    };
+    function render(o) {
+      if (!o) { result.innerHTML = ""; return; }
+      const rows = o.matches.slice().reverse().map((m) => `
+        <tr><td class="date">${m.date}</td>
+        <td><b class="f-${m.outcome}">${m.outcome}</b></td>
+        <td class="note">${m.season} · ${m.venue === "home" ? "doma" : "venku"}</td>
+        <td class="score">${m.gf}:${m.ga}</td></tr>`).join("");
+      result.innerHTML = `
+        <div class="badges">
+          <span class="badge">Zápasů: ${o.played}</span>
+          <span class="badge">Bilance: <b class="f-W">${o.won}</b>–<b class="f-D">${o.drawn}</b>–<b class="f-L">${o.lost}</b></span>
+          <span class="badge">Skóre: ${o.gf}:${o.ga}</span>
+          ${o.url ? `<a class="badge" href="${o.url}">Profil soupeře →</a>` : ""}
+          <a class="badge" href="${window.HS_BASE || ""}/srovnani/?a=${window.TEAM_SLUG}&b=${o.slug || ""}">Srovnat →</a>
+        </div>
+        <table class="results">${rows}</table>`;
+    }
+    let loaded = false;
+    async function init() {
+      if (loaded) return;
+      loaded = true;
+      const opps = (await loadData()).opponents || [];
+      const byKey = Object.fromEntries(opps.map((o) => [key(o), o]));
+      picker.innerHTML = `<option value="">— vyberte —</option>` +
+        opps.map((o) => `<option value="${key(o)}">${o.opponent} (${o.played})</option>`).join("");
+      picker.addEventListener("change", () => {
+        const o = byKey[picker.value];
+        render(o);
+        history.replaceState(null, "", o ? `#h2h=${picker.value}` : "#h2h");
+      });
+      const pre = slugFromHash();
+      if (pre && byKey[pre]) { picker.value = pre; render(byKey[pre]); }
+    }
+    if (panel.classList.contains("active")) init();
+    else panel.addEventListener("tabshow", init, { once: true });
+  })();
 });
 </script>
 {% endblock %}

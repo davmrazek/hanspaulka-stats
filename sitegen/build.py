@@ -232,6 +232,11 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
         "tier": [h["tier"] for h in history],
     }
     career = stats.build_career(matches, history)
+    opponents = stats.build_opponent_aggregates(matches)
+    for o in opponents:
+        opp = teams_by_name.get(o["opponent"], {})
+        o["url"] = opp.get("url")
+        o["slug"] = opp.get("slug")
     def match_row(m):
         return {**m.__dict__, "outcome": m.outcome,
                 "opponent_url": teams_by_name.get(m.opponent, {}).get("url")}
@@ -266,6 +271,7 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
         "roster": stats.team_roster(conn, team["id"]),
         "discipline": stats.team_discipline(conn, team["id"]),
         "career": career,
+        "opponents": opponents,
         "trend": trend,
         "trend_json": json.dumps(trend, ensure_ascii=False),
     }
@@ -444,6 +450,7 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
                 "split": ctx["split"],
                 "unbeaten": ctx["unbeaten"],
                 "discipline": ctx["discipline"],
+                "opponents": ctx["opponents"],
                 "roster": ctx["roster"][:8],
                 "biggest_win": ({"opponent": w.opponent, "gf": w.gf, "ga": w.ga,
                                  "season": w.season}
@@ -460,6 +467,13 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         title=f"Rekordy všech dob — {SITE_NAME}",
         description="Nejlepší střelci, nejdelší série bez porážky a "
                     "nejvyšší výhry v historii Hanspaulské ligy.",
+    )
+
+    render(
+        "srovnani.html", "/srovnani/",
+        title=f"Srovnání týmů — {SITE_NAME}",
+        description="Porovnejte dva týmy Hanspaulské ligy vedle sebe — forma, "
+                    "bilance, vzájemné zápasy a vývoj napříč sezónami.",
     )
 
     # season hubs + per-season records (seasons is chronological)
@@ -518,7 +532,7 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         ),
         encoding="utf-8",
     )
-    for asset in ("style.css", "app.js", "home.js", "tabs.js", "sort.js"):
+    for asset in ("style.css", "app.js", "home.js", "tabs.js", "sort.js", "srovnani.js"):
         shutil.copy(TEMPLATES / asset, out / asset)
 
     # sitemap (absolute URLs need a real origin; base_url may be a bare path)

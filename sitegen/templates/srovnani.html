@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<nav class="crumbs">
+  <a href="{{ base }}/">Hanspaulka</a> › <span>Srovnání týmů</span>
+</nav>
+<h1>Srovnání týmů</h1>
+<p class="lead">Vyberte dva týmy a porovnejte je vedle sebe. Odkaz na srovnání
+lze sdílet (parametry <code>?a=…&amp;b=…</code>).</p>
+
+<div class="compare-pickers">
+  <div class="picker">
+    <input id="pick-a" type="search" placeholder="První tým…" autocomplete="off">
+    <ul id="sug-a" class="suggest" hidden></ul>
+  </div>
+  <div class="picker">
+    <input id="pick-b" type="search" placeholder="Druhý tým…" autocomplete="off">
+    <ul id="sug-b" class="suggest" hidden></ul>
+  </div>
+</div>
+
+<p id="compare-empty" class="note">Zatím nevybráno — začněte hledáním obou týmů.</p>
+<div id="compare-out" class="two-col"></div>
+<div id="h2h-out"></div>
+
+<section id="compare-chart-wrap" hidden>
+  <h2>Vývoj napříč sezónami</h2>
+  <label>Metrika:
+    <select id="cmp-metric">
+      <option value="position">Umístění ve skupině</option>
+      <option value="tier">Liga (patro pyramidy)</option>
+      <option value="avg_goals">Průměr vstřelených gólů</option>
+      <option value="avg_conceded">Průměr obdržených gólů</option>
+      <option value="yellow">Žluté karty za sezónu</option>
+    </select>
+  </label>
+  <canvas id="compare-chart" height="300"></canvas>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<script>window.HS_BASE = "{{ base }}";</script>
+<script src="{{ base }}/srovnani.js" defer></script>
+{% endblock %}
