@@ -89,6 +89,21 @@ def test_head_to_head(conn):
     assert (h2h["GF"], h2h["GA"]) == (4, 8)
 
 
+def test_build_opponent_aggregates(conn):
+    a, _ = stats.find_team(conn, "Power Rangers")
+    matches = stats.team_matches(conn, a)
+    opps = stats.build_opponent_aggregates(matches)
+    # totals across opponents equal the team's total matches
+    assert sum(o["played"] for o in opps) == len(matches)
+    # each opponent's W/D/L sums to its played count and matches list length
+    for o in opps:
+        assert o["won"] + o["drawn"] + o["lost"] == o["played"] == len(o["matches"])
+    # matches the head_to_head aggregate for a known opponent
+    vyt = next(o for o in opps if o["opponent"] == "Výtržník HFC")
+    assert (vyt["won"], vyt["drawn"], vyt["lost"]) == (0, 0, 1)
+    assert (vyt["gf"], vyt["ga"]) == (4, 8)
+
+
 def test_cross_table(conn):
     group_id = conn.execute("SELECT id FROM groups").fetchone()[0]
     grid = stats.cross_table(conn, group_id)

@@ -238,3 +238,7 @@ table[data-sort] th.sort-desc::after { content: " ▼"; opacity: 1; }
 /* career table (team Sezóny tab) */
 .career .move-up { color: var(--win); }
 .career .move-down { color: var(--loss); }
+
+/* team comparison (/srovnani/) */
+.compare-pickers { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+.compare-pickers .picker { flex: 1 1 240px; }
