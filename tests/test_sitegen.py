@@ -49,6 +49,15 @@ def test_build_renders_all_page_types(db_path, tmp_path):
     assert 'id="dashboard"' in home and "Moje týmy" in home
     assert 'data-tab="grafy"' not in home and 'data-tab="widgety"' not in home
     assert 'href="/prefix/sezona/2025-podzim/"' in home
+    # #16: Liga dnes highlights + recap artifact
+    assert 'id="liga-dnes"' in home and "Liga dnes" in home
+    recap = (out / "recap.txt").read_text(encoding="utf-8")
+    assert "kolo" in recap
+    # #17: players search index emitted (normalised team refs)
+    players = json.loads((out / "players.json").read_text(encoding="utf-8"))
+    assert players["players"] and players["teams"]
+    name, team_idx = players["players"][0]
+    assert isinstance(name, str) and players["teams"][team_idx]
 
     group = (out / "skupina/2025-podzim/6-a/index.html").read_text(encoding="utf-8")
     assert "Průběžná tabulka" in group
@@ -96,6 +105,10 @@ def test_build_renders_all_page_types(db_path, tmp_path):
     records = (out / "rekordy/index.html").read_text(encoding="utf-8")
     assert "Nejlepší střelci" in records
     assert "data-sort" in records
+    # #15: records hub is tabbed with the three new boards
+    assert 'data-tabs' in records
+    for panel in ("fairplay", "vernost", "golmani"):
+        assert f'data-panel="{panel}"' in records
 
     # season hub + per-season records (#7, #9)
     hub = (out / "sezona/2025-podzim/index.html").read_text(encoding="utf-8")

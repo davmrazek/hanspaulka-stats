@@ -242,3 +242,13 @@ table[data-sort] th.sort-desc::after { content: " ▼"; opacity: 1; }
 /* team comparison (/srovnani/) */
 .compare-pickers { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
 .compare-pickers .picker { flex: 1 1 240px; }
+
+/* grouped search results (#17) */
+.search-head {
+  padding: .3rem .6rem; font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--muted-foreground);
+  background: var(--muted); font-weight: 700;
+}
+
+/* Liga dnes home section (#16) */
+#liga-dnes .card h3 { margin-top: 0; }

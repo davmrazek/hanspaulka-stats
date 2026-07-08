@@ -4,54 +4,113 @@
 <p class="lead">Napříč všemi sezónami v databázi. Hráčské statistiky se počítají
 na hráče v rámci týmu (stejné jméno v různých týmech = různé záznamy).</p>
 
-<h2>Nejlepší střelci</h2>
-<table class="records" data-sort>
-  <tr><th>#</th><th>Hráč</th><th>Tým</th><th>Gólů</th></tr>
-  {% for name, team, goals in scorers %}
-  <tr>
-    <td>{{ loop.index }}.</td>
-    <td>{{ name }}</td>
-    <td>{{ team }}</td>
-    <td><strong>{{ goals }}</strong></td>
-  </tr>
-  {% endfor %}
-</table>
+<nav class="tabs" data-tabs>
+  <button data-tab="strelci">Střelci</button>
+  <button data-tab="serie">Série bez porážky</button>
+  <button data-tab="vyhry">Nejvyšší výhry</button>
+  <button data-tab="goly">Nejvíc gólů</button>
+  <button data-tab="fairplay">Fair play</button>
+  <button data-tab="vernost">Věrnost</button>
+  <button data-tab="golmani">Gólmani</button>
+</nav>
 
-<h2>Nejdelší série bez porážky</h2>
-<table class="records" data-sort>
-  <tr><th>#</th><th>Tým</th><th>Zápasů</th></tr>
-  {% for name, run, url in unbeaten %}
-  <tr>
-    <td>{{ loop.index }}.</td>
-    <td>{% if url %}<a href="{{ base }}{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</td>
-    <td><strong>{{ run }}</strong></td>
-  </tr>
-  {% endfor %}
-</table>
+<section data-panel="strelci">
+  <h2>Nejlepší střelci</h2>
+  <table class="records" data-sort>
+    <tr><th>#</th><th>Hráč</th><th>Tým</th><th>Gólů</th></tr>
+    {% for name, team, goals in scorers %}
+    <tr><td>{{ loop.index }}.</td><td>{{ name }}</td><td>{{ team }}</td><td><strong>{{ goals }}</strong></td></tr>
+    {% endfor %}
+  </table>
+</section>
 
-<h2>Nejvyšší výhry</h2>
-<table class="results records" data-sort>
-  <tr><th>Sezóna</th><th>Zápas</th><th>Skóre</th></tr>
-  {% for season, tier, letter, home, away, hg, ag in biggest %}
-  <tr>
-    <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
-    <td>{{ home }} – {{ away }}</td>
-    <td class="score"><strong>{{ hg }}:{{ ag }}</strong></td>
-  </tr>
-  {% endfor %}
-</table>
+<section data-panel="serie">
+  <h2>Nejdelší série bez porážky</h2>
+  <table class="records" data-sort>
+    <tr><th>#</th><th>Tým</th><th>Zápasů</th></tr>
+    {% for name, run, url in unbeaten %}
+    <tr>
+      <td>{{ loop.index }}.</td>
+      <td>{% if url %}<a href="{{ base }}{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</td>
+      <td><strong>{{ run }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
 
-<h2>Nejvíc gólů v zápase</h2>
-<table class="results records" data-sort>
-  <tr><th>Sezóna</th><th>Zápas</th><th>Skóre</th></tr>
-  {% for season, tier, letter, home, away, hg, ag in most_goals %}
-  <tr>
-    <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
-    <td>{{ home }} – {{ away }}</td>
-    <td class="score"><strong>{{ hg }}:{{ ag }}</strong></td>
-  </tr>
-  {% endfor %}
-</table>
+<section data-panel="vyhry">
+  <h2>Nejvyšší výhry</h2>
+  <table class="results records" data-sort>
+    <tr><th>Sezóna</th><th>Zápas</th><th>Skóre</th></tr>
+    {% for season, tier, letter, home, away, hg, ag in biggest %}
+    <tr>
+      <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
+      <td>{{ home }} – {{ away }}</td>
+      <td class="score"><strong>{{ hg }}:{{ ag }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section data-panel="goly">
+  <h2>Nejvíc gólů v zápase</h2>
+  <table class="results records" data-sort>
+    <tr><th>Sezóna</th><th>Zápas</th><th>Skóre</th></tr>
+    {% for season, tier, letter, home, away, hg, ag in most_goals %}
+    <tr>
+      <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
+      <td>{{ home }} – {{ away }}</td>
+      <td class="score"><strong>{{ hg }}:{{ ag }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section data-panel="fairplay">
+  <h2>Fair play — nejméně karet na zápas</h2>
+  <p class="note">Jen týmy s alespoň 50 odehranými zápasy. Neutrální týmová
+  statistika (žádné hodnocení jednotlivců).</p>
+  <table class="records" data-sort>
+    <tr><th>Tým</th><th>Zápasů</th><th>Karet</th><th>Na zápas</th></tr>
+    {% for r in fairplay %}
+    <tr>
+      <td>{% if r.url %}<a href="{{ base }}{{ r.url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
+      <td>{{ r.matches }}</td>
+      <td>{{ r.cards }}</td>
+      <td><strong>{{ "%.3f"|format(r.per_match) }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section data-panel="vernost">
+  <h2>Věrnost — nejvíc odehraných sezón</h2>
+  <table class="records" data-sort>
+    <tr><th>#</th><th>Tým</th><th>Sezón</th></tr>
+    {% for name, seasons, url in loyalty %}
+    <tr>
+      <td>{{ loop.index }}.</td>
+      <td>{% if url %}<a href="{{ base }}{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</td>
+      <td><strong>{{ seasons }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section data-panel="golmani">
+  <h2>Gólmani — nejvíc startů v bráně</h2>
+  <table class="records" data-sort>
+    <tr><th>#</th><th>Hráč</th><th>Tým</th><th>Startů v bráně</th></tr>
+    {% for name, team, apps in goalkeepers %}
+    <tr>
+      <td>{{ loop.index }}.</td>
+      <td>{{ name }}</td>
+      <td>{% if team in teams_by_name %}<a href="{{ base }}{{ teams_by_name[team].url }}#hraci">{{ team }}</a>{% else %}{{ team }}{% endif %}</td>
+      <td><strong>{{ apps }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
 
 <h2>Rekordy sezón</h2>
 <ul class="group-list">

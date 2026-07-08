@@ -59,6 +59,23 @@ def spark_svg(matches: list[dict]) -> str:
     )
 
 
+def _recap_text(h: dict | None) -> str:
+    """Plain-text round recap for copy-paste into social posts (Phase 5)."""
+    if not h:
+        return "Právě probíhá přestávka mezi sezónami.\n"
+    b, m = h["biggest"], h["most"]
+    lines = [
+        f"⚽ Hanspaulka — {h['season']}, {h['round']}. kolo ({h['matches']} zápasů)",
+        "",
+        f"Nejvyšší výhra: {b['home']} {b['hg']}:{b['ag']} {b['away']} ({b['group']})",
+        f"Nejvíc gólů: {m['home']} {m['hg']}:{m['ag']} {m['away']} ({m['group']})",
+    ]
+    if h["scorers"]:
+        tops = ", ".join(f"{n} ({t}) {g}" for n, t, g in h["scorers"])
+        lines.append(f"Střelci kola: {tops}")
+    return "\n".join(lines) + "\n"
+
+
 def slugify(name: str) -> str:
     text = unicodedata.normalize("NFKD", name)
     text = "".join(c for c in text if not unicodedata.combining(c))
@@ -319,11 +336,21 @@ def records_context(conn, teams_by_name: dict) -> dict:
             runs.append((name, longest, teams_by_name.get(name, {}).get("url")))
     runs.sort(key=lambda r: -r[1])
 
+    fairplay = stats.all_time_fairplay(conn, limit=20)
+    for r in fairplay:
+        r["url"] = teams_by_name.get(r["team"], {}).get("url")
+    loyalty = [
+        (name, seasons, teams_by_name.get(name, {}).get("url"))
+        for name, seasons in stats.most_seasons(conn, limit=20)
+    ]
     return {
         "scorers": scorer_board,
         "biggest": biggest,
         "most_goals": most_goals,
         "unbeaten": runs[:20],
+        "fairplay": fairplay,
+        "loyalty": loyalty,
+        "goalkeepers": stats.top_goalkeepers(conn, limit=20),
     }
 
 
@@ -379,6 +406,7 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         "teams": len(teams),
         "seasons": len(seasons),
     }
+    liga_dnes = stats.latest_round_highlights(conn, latest_season)
     render(
         "index.html", "/",
         pyramid=stats.tier_pyramid(conn, latest_season),
@@ -386,10 +414,12 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         seasons=seasons[::-1],
         season_groups=season_groups,
         totals=totals,
+        liga_dnes=liga_dnes,
         title=f"{SITE_NAME} — statistiky Hanspaulské ligy",
         description="Tabulky, střelci a historie týmů Hanspaulské ligy — "
                     "statistiky, které jinde nenajdete.",
     )
+    (out / "recap.txt").write_text(_recap_text(liga_dnes), encoding="utf-8")
 
     for g in groups:
         ctx = group_context(conn, g, teams_by_name)
@@ -464,6 +494,7 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         "records.html", "/rekordy/",
         **records_context(conn, teams_by_name),
         seasons=seasons[::-1],
+        teams_by_name=teams_by_name,
         title=f"Rekordy všech dob — {SITE_NAME}",
         description="Nejlepší střelci, nejdelší série bez porážky a "
                     "nejvyšší výhry v historii Hanspaulské ligy.",
@@ -528,6 +559,25 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
                                    g["season_slug"], g["tier"], g["letter"]),
                 )
             ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    # players.json: name-per-team identity (same name in two teams = two rows,
+    # see CLAUDE.md). Team name+slug are normalised into a shared `teams` array
+    # and referenced by index, keeping the ~25k-player index small over the
+    # wire. Each player links to the team's Hráči tab.
+    team_ref = {t["id"]: i for i, t in enumerate(teams)}
+    (out / "players.json").write_text(
+        json.dumps(
+            {
+                "teams": [[t["name"], t["slug"]] for t in teams],
+                "players": [
+                    [name, team_ref[team_id]]
+                    for name, team_id in conn.execute(
+                        "SELECT name, team_id FROM players ORDER BY name")
+                ],
+            },
             ensure_ascii=False,
         ),
         encoding="utf-8",
