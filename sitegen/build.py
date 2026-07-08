@@ -358,6 +358,17 @@ def records_context(conn, teams_by_name: dict) -> dict:
 
 
 def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") -> int:
+    """Render the site atomically. On any failure the half-built staging dir is
+    removed and the existing `out` is left untouched."""
+    staging = out.parent / f".{out.name}.staging"
+    try:
+        return _build(db_path, out, base_url)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
+def _build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") -> int:
     conn = connect(db_path)
     env = Environment(
         loader=FileSystemLoader(TEMPLATES),
@@ -371,12 +382,17 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
         "built_at": dt.date.today().isoformat(),
     })
 
+    # Build into a fresh staging dir and swap it in at the very end, so a
+    # failed or overlapping build never leaves `out` half-written. `out` is
+    # rebound to staging for the whole render; `dest` is the final location.
+    dest = out
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    out = dest.parent / f".{dest.name}.staging"
     if out.exists():
-        for child in out.iterdir():
-            if child.name == "CNAME":
-                continue
-            shutil.rmtree(child) if child.is_dir() else child.unlink()
-    out.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+    if (dest / "CNAME").exists():
+        shutil.copy(dest / "CNAME", out / "CNAME")  # deploy artifact, preserve
 
     groups = load_groups(conn)
     populated = {g["season_slug"] for g in groups}
@@ -598,7 +614,19 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
     )
 
     conn.close()
-    print(f"built {len(pages)} pages -> {out}")
+
+    # swap staging into place: move the old tree aside, rename staging, then
+    # drop the old tree. `out` is only ever a complete build.
+    old = dest.parent / f".{dest.name}.old"
+    if old.exists():
+        shutil.rmtree(old)
+    if dest.exists():
+        dest.rename(old)
+    out.rename(dest)
+    if old.exists():
+        shutil.rmtree(old)
+
+    print(f"built {len(pages)} pages -> {dest}")
     return len(pages)
 
 

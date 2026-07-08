@@ -133,3 +133,29 @@ def test_rebuild_preserves_cname(db_path, tmp_path):
     build.build(db_path, out)
     assert (out / "CNAME").read_text() == "example.cz"
     assert not (out / "stale.html").exists()
+
+
+def test_failed_build_leaves_previous_site_intact(db_path, tmp_path, monkeypatch):
+    """A build that errors mid-render must not corrupt the existing site:
+    the staging swap only happens on success."""
+    out = tmp_path / "site"
+    build.build(db_path, out)  # good initial build
+    before = (out / "index.html").read_text(encoding="utf-8")
+
+    # make records rendering blow up partway through the next build
+    def boom(*a, **k):
+        raise RuntimeError("render failed")
+    monkeypatch.setattr(build, "records_context", boom)
+    with pytest.raises(RuntimeError):
+        build.build(db_path, out)
+
+    # previous site is still fully intact, no leftover staging dirs
+    assert (out / "index.html").read_text(encoding="utf-8") == before
+    assert not list(tmp_path.glob(".*.staging"))
+
+
+def test_footer_hansref_funnel(db_path, tmp_path):
+    out = tmp_path / "site"
+    build.build(db_path, out)
+    home = (out / "index.html").read_text(encoding="utf-8")
+    assert "HansRef.cz" in home and 'href="https://hansref.cz"' in home
