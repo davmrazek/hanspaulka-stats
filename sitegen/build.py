@@ -164,13 +164,14 @@ def group_context(conn, group: dict, teams_by_name: dict) -> dict:
 
     positions = stats.position_by_round(conn, group["id"])
     team_order = positions[max(positions)] if positions else []
-    chart = {
+    position_chart = {
         "rounds": sorted(positions),
         "series": [
             {"team": t, "positions": [positions[r].index(t) + 1 for r in sorted(positions)]}
             for t in team_order
         ],
     }
+    charts = {"position": position_chart, **stats.group_stat_charts(conn, group["id"])}
 
     scorers = conn.execute(
         """
@@ -197,7 +198,7 @@ def group_context(conn, group: dict, teams_by_name: dict) -> dict:
         "rounds": dict(sorted(rounds.items())),
         "cross": stats.cross_table(conn, group["id"]),
         "cross_teams": [r["team"] for r in table],
-        "chart_json": json.dumps(chart, ensure_ascii=False),
+        "charts": charts,
         "scorers": scorers,
         "fairplay": stats.group_fairplay(conn, group["id"]),
         "deductions": stats.point_deductions(conn, group["id"]),
@@ -210,21 +211,27 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
     wins, losses = stats.biggest_results(matches)
     longest, current = stats.longest_unbeaten(matches)
     goals_by_season: dict[str, list[int]] = defaultdict(list)
+    conceded_by_season: dict[str, list[int]] = defaultdict(list)
     for m in matches:
         goals_by_season[m.season].append(m.gf)
+        conceded_by_season[m.season].append(m.ga)
     cards_by_season = stats.team_cards_by_season(conn, team["id"])
+
+    def per_game(bucket: dict[str, list[int]], season: str) -> float:
+        vals = bucket[season]
+        return round(sum(vals) / len(vals), 2) if vals else 0
+
     trend = {
         "seasons": [h["season"] for h in history],
-        "avg_goals": [
-            round(sum(goals_by_season[h["season"]]) / len(goals_by_season[h["season"]]), 2)
-            if goals_by_season[h["season"]] else 0
-            for h in history
-        ],
+        "avg_goals": [per_game(goals_by_season, h["season"]) for h in history],
+        "avg_conceded": [per_game(conceded_by_season, h["season"]) for h in history],
         "yellow": [cards_by_season.get(h["season"], {}).get("yellow", 0)
                    for h in history],
         "red": [cards_by_season.get(h["season"], {}).get("red", 0)
                 for h in history],
+        "tier": [h["tier"] for h in history],
     }
+    career = stats.build_career(matches, history)
     def match_row(m):
         return {**m.__dict__, "outcome": m.outcome,
                 "opponent_url": teams_by_name.get(m.opponent, {}).get("url")}
@@ -258,6 +265,8 @@ def team_context(conn, team: dict, groups_by_id: dict, teams_by_name: dict) -> d
         "scorers": stats.team_top_scorers(conn, team["id"], limit=10),
         "roster": stats.team_roster(conn, team["id"]),
         "discipline": stats.team_discipline(conn, team["id"]),
+        "career": career,
+        "trend": trend,
         "trend_json": json.dumps(trend, ensure_ascii=False),
     }
 
@@ -403,6 +412,7 @@ def build(db_path: Path = DB_PATH, out: Path = DEFAULT_OUT, base_url: str = "") 
                     {"team": t2, "yellow": yc, "red": rc}
                     for t2, yc, rc in ctx["fairplay"]
                 ],
+                "charts": ctx["charts"],
             }, ensure_ascii=False),
             encoding="utf-8",
         )

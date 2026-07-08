@@ -152,6 +152,34 @@ def season_history(conn, team_id: int) -> list[dict]:
     return history
 
 
+def build_career(matches: list[TeamMatch], history: list[dict]) -> list[dict]:
+    """Transfermarkt-style per-season career rows from already-loaded matches
+    and season_history. W/D/L, score and points are derived from results
+    (points = won*WIN_POINTS + drawn, so administrative deductions are not
+    reflected — the group page stays authoritative for published points).
+    `move` is the tier change vs the previous season: >0 promoted (postup),
+    <0 relegated (sestup)."""
+    agg: dict[str, dict[str, int]] = {}
+    for m in matches:
+        a = agg.setdefault(
+            m.season, {"won": 0, "drawn": 0, "lost": 0, "gf": 0, "ga": 0})
+        a["won" if m.outcome == "W" else "drawn" if m.outcome == "D" else "lost"] += 1
+        a["gf"] += m.gf
+        a["ga"] += m.ga
+    rows = []
+    prev_tier = None
+    for h in history:  # chronological
+        a = agg.get(h["season"], {"won": 0, "drawn": 0, "lost": 0, "gf": 0, "ga": 0})
+        played = a["won"] + a["drawn"] + a["lost"]
+        rows.append({
+            **h, **a, "played": played,
+            "points": a["won"] * WIN_POINTS + a["drawn"],
+            "move": 0 if prev_tier is None else prev_tier - h["tier"],
+        })
+        prev_tier = h["tier"]
+    return rows
+
+
 def longest_unbeaten(matches: list[TeamMatch]) -> tuple[int, int]:
     """(longest unbeaten run, current unbeaten run) across all seasons."""
     longest = current = 0
@@ -379,6 +407,48 @@ def match_points(conn, group_id: int) -> dict[str, int]:
             pts[home] += 1
             pts[away] += 1
     return dict(pts)
+
+
+def group_stat_charts(conn, group_id: int, top: int = 5) -> dict:
+    """Prebuilt chart series for the group Statistiky tab:
+    cumulative scorer race (top N), goals per round, home/draw/away split."""
+    race = scorer_race(conn, group_id, top)
+    rounds = sorted(race)
+    leaders = [p for p, _ in race[rounds[-1]]] if rounds else []
+    scorer_series = [
+        {"player": p, "cum": [dict(race[r]).get(p, 0) for r in rounds]}
+        for p in leaders
+    ]
+
+    gpr = conn.execute(
+        """
+        SELECT m.round, SUM(m.home_goals + m.away_goals)
+        FROM matches m
+        WHERE m.group_id = ? AND m.home_goals IS NOT NULL
+        GROUP BY m.round ORDER BY m.round
+        """,
+        (group_id,),
+    ).fetchall()
+
+    home = draw = away = 0
+    for hg, ag in conn.execute(
+        "SELECT home_goals, away_goals FROM matches "
+        "WHERE group_id = ? AND home_goals IS NOT NULL",
+        (group_id,),
+    ):
+        if hg > ag:
+            home += 1
+        elif hg < ag:
+            away += 1
+        else:
+            draw += 1
+
+    return {
+        "scorer_race": {"rounds": rounds, "series": scorer_series},
+        "goals_per_round": {"rounds": [r for r, _ in gpr],
+                            "goals": [g for _, g in gpr]},
+        "home_away": {"home": home, "draw": draw, "away": away},
+    }
 
 
 def point_deductions(conn, group_id: int) -> dict[str, int]:

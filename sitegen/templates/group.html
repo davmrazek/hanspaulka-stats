@@ -115,6 +115,12 @@
 <section data-panel="statistiky">
   <h2>Vývoj pořadí po kolech</h2>
   <canvas id="position-chart" height="320"></canvas>
+  <h2>Souboj střelců (kumulativně, top 5)</h2>
+  <canvas id="scorer-chart" height="280"></canvas>
+  <h2>Góly na kolo</h2>
+  <canvas id="goals-chart" height="220"></canvas>
+  <h2>Výhry doma / venku</h2>
+  <canvas id="homeaway-chart" height="220"></canvas>
 </section>
 {% endblock %}
 
@@ -122,30 +128,72 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 window.addEventListener("DOMContentLoaded", () => {
-  const data = {{ chart_json | safe }};
-  if (!data.rounds.length) return;
   const panel = document.querySelector('[data-panel="statistiky"]');
+  const color = (i) => `hsl(${(i * 137) % 360} 65% 45%)`;
   let drawn = false;
-  function draw() {
+  async function draw() {
     if (drawn) return;
     drawn = true;
-    new Chart(document.getElementById("position-chart"), {
-      type: "line",
+    const c = (await (await fetch("data.json")).json()).charts;
+
+    if (c.position.rounds.length) {
+      new Chart(document.getElementById("position-chart"), {
+        type: "line",
+        data: {
+          labels: c.position.rounds.map((r) => r + "."),
+          datasets: c.position.series.map((s, i) => ({
+            label: s.team, data: s.positions,
+            borderColor: color(i), backgroundColor: "transparent", tension: 0.2,
+          })),
+        },
+        options: {
+          responsive: true,
+          scales: { y: { reverse: true, ticks: { stepSize: 1 }, title: { display: true, text: "Pořadí" } } },
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
+        },
+      });
+    }
+
+    const sr = c.scorer_race;
+    if (sr.series.length) {
+      new Chart(document.getElementById("scorer-chart"), {
+        type: "line",
+        data: {
+          labels: sr.rounds.map((r) => r + "."),
+          datasets: sr.series.map((s, i) => ({
+            label: s.player, data: s.cum,
+            borderColor: color(i), backgroundColor: "transparent", tension: 0.1, stepped: true,
+          })),
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, title: { display: true, text: "Góly" } } },
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
+        },
+      });
+    }
+
+    const gpr = c.goals_per_round;
+    if (gpr.rounds.length) {
+      new Chart(document.getElementById("goals-chart"), {
+        type: "bar",
+        data: {
+          labels: gpr.rounds.map((r) => r + "."),
+          datasets: [{ label: "Góly", data: gpr.goals, backgroundColor: "#fbba00" }],
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } },
+      });
+    }
+
+    const ha = c.home_away;
+    new Chart(document.getElementById("homeaway-chart"), {
+      type: "doughnut",
       data: {
-        labels: data.rounds.map(r => r + "."),
-        datasets: data.series.map((s, i) => ({
-          label: s.team,
-          data: s.positions,
-          borderColor: `hsl(${(i * 137) % 360} 65% 45%)`,
-          backgroundColor: "transparent",
-          tension: 0.2,
-        })),
+        labels: ["Výhra domácích", "Remíza", "Výhra hostů"],
+        datasets: [{ data: [ha.home, ha.draw, ha.away],
+                     backgroundColor: ["#1a7a3d", "#b58900", "#c0392b"] }],
       },
-      options: {
-        responsive: true,
-        scales: { y: { reverse: true, ticks: { stepSize: 1 }, title: { display: true, text: "Pořadí" } } },
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
-      },
+      options: { responsive: true, plugins: { legend: { position: "bottom" } } },
     });
   }
   if (panel.classList.contains("active")) draw();

@@ -25,25 +25,12 @@
 <nav class="tabs" data-tabs>
   <button data-tab="prehled">Přehled</button>
   <button data-tab="zapasy">Zápasy</button>
+  <button data-tab="sezony">Sezóny</button>
   <button data-tab="hraci">Hráči</button>
+  <button data-tab="statistiky">Statistiky</button>
 </nav>
 
 <section data-panel="prehled">
-  <h2>Historie sezón</h2>
-  <table class="history" data-sort>
-    <tr><th>Sezóna</th><th>Skupina</th><th>Umístění</th></tr>
-    {% for h in history %}
-    <tr>
-      <td>{{ h.season }}</td>
-      <td>{{ h.group }}</td>
-      <td>{{ h.position }}.{% if not h.final %} <span class="note">(průběžně)</span>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
-
-  <h2>Průměr vstřelených gólů na zápas</h2>
-  <canvas id="trend-chart" height="200"></canvas>
-
   <h2>Doma / venku (všechny sezóny)</h2>
   <table class="splits">
     <tr><th></th><th>Z</th><th>V</th><th>R</th><th>P</th><th>Skóre</th></tr>
@@ -95,6 +82,28 @@
   {% endfor %}
 </section>
 
+<section data-panel="sezony">
+  <h2>Kariéra po sezónách</h2>
+  <div class="scroll-x">
+  <table class="career" data-sort>
+    <tr><th>Sezóna</th><th>Skupina</th><th>Umístění</th><th>Z</th><th>V</th><th>R</th><th>P</th><th>Skóre</th><th>Body</th><th>Pohyb</th></tr>
+    {% for c in career | reverse %}
+    <tr>
+      <td>{{ c.season }}</td>
+      <td>{{ c.group }}</td>
+      <td>{{ c.position }}.{% if not c.final %} <span class="note">(průběžně)</span>{% endif %}</td>
+      <td>{{ c.played }}</td><td>{{ c.won }}</td><td>{{ c.drawn }}</td><td>{{ c.lost }}</td>
+      <td>{{ c.gf }}:{{ c.ga }}</td><td><strong>{{ c.points }}</strong></td>
+      <td>{% if c.move > 0 %}<b class="move-up">↑ {{ c.move }}</b>{% elif c.move < 0 %}<b class="move-down">↓ {{ -c.move }}</b>{% else %}–{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+
+  <h2>Postup pyramidou (patro ligy)</h2>
+  <canvas id="tier-chart" height="220"></canvas>
+</section>
+
 <section data-panel="hraci">
   <h2>Hráči (všechny sezóny)</h2>
   <div class="scroll-x">
@@ -115,22 +124,94 @@
   </table>
   </div>
 </section>
+
+<section data-panel="statistiky">
+  <h2>Vstřelené / obdržené góly na zápas</h2>
+  <canvas id="goals-chart" height="220"></canvas>
+  <h2>Karty po sezónách</h2>
+  <canvas id="cards-chart" height="220"></canvas>
+  <h2>Doma / venku (bilance)</h2>
+  <canvas id="split-chart" height="220"></canvas>
+</section>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 window.addEventListener("DOMContentLoaded", () => {
-  const t = {{ trend_json | safe }};
-  if (!t.seasons.length) return;
-  new Chart(document.getElementById("trend-chart"), {
-    type: "bar",
-    data: {
-      labels: t.seasons,
-      datasets: [{ label: "Průměr gólů / zápas", data: t.avg_goals,
-                   backgroundColor: "#fbba00" }],
-    },
-    options: { responsive: true, plugins: { legend: { display: false } } },
+  let dataPromise = null;
+  const loadData = () =>
+    dataPromise ?? (dataPromise = fetch("data.json").then((r) => r.json()));
+
+  function onShow(panelName, fn) {
+    const panel = document.querySelector(`[data-panel="${panelName}"]`);
+    let done = false;
+    const run = async () => { if (done) return; done = true; fn(await loadData()); };
+    if (panel.classList.contains("active")) run();
+    else panel.addEventListener("tabshow", run, { once: true });
+  }
+
+  onShow("sezony", (d) => {
+    const t = d.trend;
+    if (!t.seasons.length) return;
+    new Chart(document.getElementById("tier-chart"), {
+      type: "line",
+      data: {
+        labels: t.seasons,
+        datasets: [{ label: "Patro ligy", data: t.tier, stepped: true,
+                     borderColor: "#fbba00", backgroundColor: "transparent" }],
+      },
+      options: {
+        responsive: true,
+        scales: { y: { reverse: true, ticks: { stepSize: 1 }, title: { display: true, text: "Liga" } } },
+        plugins: { legend: { display: false } },
+      },
+    });
+  });
+
+  onShow("statistiky", (d) => {
+    const t = d.trend;
+    if (!t.seasons.length) return;
+    new Chart(document.getElementById("goals-chart"), {
+      type: "line",
+      data: {
+        labels: t.seasons,
+        datasets: [
+          { label: "Vstřelené / zápas", data: t.avg_goals,
+            borderColor: "#1a7a3d", backgroundColor: "transparent", tension: 0.2 },
+          { label: "Obdržené / zápas", data: t.avg_conceded,
+            borderColor: "#c0392b", backgroundColor: "transparent", tension: 0.2 },
+        ],
+      },
+      options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+    });
+    new Chart(document.getElementById("cards-chart"), {
+      type: "bar",
+      data: {
+        labels: t.seasons,
+        datasets: [
+          { label: "ŽK", data: t.yellow, backgroundColor: "#e6b800" },
+          { label: "ČK", data: t.red, backgroundColor: "#c0392b" },
+        ],
+      },
+      options: {
+        responsive: true,
+        scales: { x: { stacked: true }, y: { stacked: true } },
+        plugins: { legend: { position: "bottom" } },
+      },
+    });
+    const s = d.split;
+    new Chart(document.getElementById("split-chart"), {
+      type: "bar",
+      data: {
+        labels: ["Výhry", "Remízy", "Prohry"],
+        datasets: [
+          { label: "Doma", data: [s.home.W, s.home.D, s.home.L], backgroundColor: "#fbba00" },
+          { label: "Venku", data: [s.away.W, s.away.D, s.away.L], backgroundColor: "#6b6b6b" },
+        ],
+      },
+      options: { responsive: true, plugins: { legend: { position: "bottom" } } },
+    });
   });
 });
 </script>

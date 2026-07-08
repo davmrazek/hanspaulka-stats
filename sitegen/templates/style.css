@@ -234,3 +234,7 @@ table[data-sort] th.sort-desc::after { content: " ▼"; opacity: 1; }
 /* season hub movers */
 .move-up { color: var(--win); }
 .move-down { color: var(--loss); }
+
+/* career table (team Sezóny tab) */
+.career .move-up { color: var(--win); }
+.career .move-down { color: var(--loss); }
