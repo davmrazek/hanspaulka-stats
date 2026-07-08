@@ -380,3 +380,29 @@ def test_season_movers_real(real_conn):
     assert len(teams) == len(set(teams))
     assert all(m["from_tier"] != m["to_tier"] for m in movers)
     assert all(m["up"] == (m["to_tier"] < m["from_tier"]) for m in movers)
+
+
+@needs_real_db
+def test_all_time_records_boards(real_conn):
+    """Records-hub boards (#15) on real data."""
+    fp = stats.all_time_fairplay(real_conn, limit=20, min_matches=50)
+    assert fp and all(r["matches"] >= 50 for r in fp)
+    assert fp == sorted(fp, key=lambda r: (r["per_match"], r["team"]))
+
+    loyalty = stats.most_seasons(real_conn, limit=20)
+    assert len(loyalty) == 20
+    assert [s for _, s in loyalty] == sorted((s for _, s in loyalty), reverse=True)
+
+    gks = stats.top_goalkeepers(real_conn, limit=20)
+    assert gks and gks[0][2] >= gks[-1][2]  # gk appearances descending
+
+
+@needs_real_db
+def test_latest_round_highlights(real_conn):
+    h = stats.latest_round_highlights(real_conn, "2025-podzim")
+    assert h and h["round"] >= 1 and h["matches"] > 0
+    b, m = h["biggest"], h["most"]
+    # biggest win has the largest goal margin; most goals the largest total
+    assert abs(b["hg"] - b["ag"]) >= abs(m["hg"] - m["ag"])
+    assert m["hg"] + m["ag"] >= b["hg"] + b["ag"]
+    assert isinstance(h["scorers"], list)

@@ -5,6 +5,32 @@
 z veřejných výsledků {{ totals.seasons }} sezón: {{ totals.matches }} zápasů,
 {{ totals.goals }} gólů, {{ totals.teams }} týmů.</p>
 
+{% if liga_dnes %}
+<section id="liga-dnes">
+  <h2>Liga dnes — {{ liga_dnes.season }}, {{ liga_dnes.round }}. kolo</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>Nejvyšší výhra</h3>
+      <p>{{ liga_dnes.biggest.home }} <strong>{{ liga_dnes.biggest.hg }}:{{ liga_dnes.biggest.ag }}</strong> {{ liga_dnes.biggest.away }}</p>
+      <p class="note">skupina {{ liga_dnes.biggest.group }}</p>
+    </div>
+    <div class="card">
+      <h3>Nejvíc gólů</h3>
+      <p>{{ liga_dnes.most.home }} <strong>{{ liga_dnes.most.hg }}:{{ liga_dnes.most.ag }}</strong> {{ liga_dnes.most.away }}</p>
+      <p class="note">skupina {{ liga_dnes.most.group }}</p>
+    </div>
+    <div class="card">
+      <h3>Střelci kola</h3>
+      <ol class="scorers">
+        {% for name, team, goals in liga_dnes.scorers %}
+        <li>{{ name }} <span class="note">({{ team }})</span> — <strong>{{ goals }}</strong></li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <section id="dashboard">
   <h2>Moje týmy</h2>
   <p class="lead">Sledujte formu a výsledky svých týmů. Výběr se ukládá jen ve vašem prohlížeči.</p>

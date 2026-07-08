@@ -529,6 +529,116 @@ def all_time_scorers(conn, limit: int = 20) -> list[tuple[str, str, int]]:
     ).fetchall()
 
 
+def all_time_fairplay(conn, limit: int = 20, min_matches: int = 50) -> list[dict]:
+    """Cleanest teams all-time: fewest cards per match (min_matches threshold).
+    Team-level only — no player-negative stats (see CLAUDE.md).
+    [{team, url_name, matches, cards, per_match}]."""
+    played = dict(conn.execute(
+        """
+        SELECT t.id, COUNT(*) FROM matches m
+        JOIN teams t ON t.id IN (m.home_team_id, m.away_team_id)
+        WHERE m.home_goals IS NOT NULL
+        GROUP BY t.id
+        """
+    ))
+    rows = []
+    for team_id, name, cards in conn.execute(
+        """
+        SELECT t.id, t.name, COUNT(c.id)
+        FROM teams t LEFT JOIN cards c ON c.team_id = t.id
+        GROUP BY t.id
+        """
+    ):
+        n = played.get(team_id, 0)
+        if n >= min_matches:
+            rows.append({"team": name, "matches": n, "cards": cards,
+                         "per_match": round(cards / n, 3)})
+    rows.sort(key=lambda r: (r["per_match"], r["team"]))
+    return rows[:limit]
+
+
+def most_seasons(conn, limit: int = 20) -> list[tuple[str, int]]:
+    """(team, distinct season count) — věrnost / loyalty board."""
+    return conn.execute(
+        """
+        SELECT t.name, COUNT(DISTINCT g.season_id) AS seasons
+        FROM group_teams gt
+        JOIN groups g ON g.id = gt.group_id
+        JOIN teams t ON t.id = gt.team_id
+        GROUP BY gt.team_id ORDER BY seasons DESC, t.name LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+
+def top_goalkeepers(conn, limit: int = 20) -> list[tuple[str, str, int]]:
+    """(player, team, goalkeeper appearances). Name-per-team identity, as with
+    scorers — no cross-team merging."""
+    return conn.execute(
+        """
+        SELECT p.name, t.name, COUNT(*) AS gk_apps
+        FROM appearances a
+        JOIN players p ON p.id = a.player_id
+        JOIN teams t ON t.id = a.team_id
+        WHERE a.role = 'goalkeeper'
+        GROUP BY p.id ORDER BY gk_apps DESC, p.name LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+
+def latest_round_highlights(conn, season_slug: str) -> dict | None:
+    """Highlights of the newest completed round in a season: biggest win,
+    most goals, and the round's top scorers. Powers the home 'Liga dnes'
+    section and the recap.txt artifact. None if the season has no results."""
+    rnd = conn.execute(
+        """
+        SELECT MAX(m.round) FROM matches m
+        JOIN groups g ON g.id = m.group_id
+        JOIN seasons s ON s.id = g.season_id
+        WHERE s.year || '-' || s.half = ? AND m.home_goals IS NOT NULL
+        """,
+        (season_slug,),
+    ).fetchone()[0]
+    if rnd is None:
+        return None
+    matches = conn.execute(
+        """
+        SELECT g.tier, g.letter, th.name, ta.name, m.home_goals, m.away_goals
+        FROM matches m
+        JOIN groups g ON g.id = m.group_id
+        JOIN seasons s ON s.id = g.season_id
+        JOIN teams th ON th.id = m.home_team_id
+        JOIN teams ta ON ta.id = m.away_team_id
+        WHERE s.year || '-' || s.half = ? AND m.round = ? AND m.home_goals IS NOT NULL
+        """,
+        (season_slug, rnd),
+    ).fetchall()
+
+    def fmt(r):
+        return {"group": f"{r[0]}{r[1].upper()}", "home": r[2], "away": r[3],
+                "hg": r[4], "ag": r[5]}
+
+    biggest = fmt(max(matches, key=lambda r: (abs(r[4] - r[5]), r[4] + r[5])))
+    most = fmt(max(matches, key=lambda r: (r[4] + r[5], abs(r[4] - r[5]))))
+    scorers = conn.execute(
+        """
+        SELECT p.name, t.name, COUNT(*) AS goals
+        FROM goals gl
+        JOIN matches m ON m.id = gl.match_id
+        JOIN groups g ON g.id = m.group_id
+        JOIN seasons s ON s.id = g.season_id
+        JOIN players p ON p.id = gl.player_id
+        JOIN teams t ON t.id = gl.team_id
+        WHERE s.year || '-' || s.half = ? AND m.round = ? AND gl.own_goal = 0
+        GROUP BY p.id ORDER BY goals DESC, p.name LIMIT 5
+        """,
+        (season_slug, rnd),
+    ).fetchall()
+    return {"season": season_slug, "round": rnd, "matches": len(matches),
+            "biggest": biggest, "most": most, "scorers": scorers}
+
+
 def season_goals_per_round(conn, season_slug: str) -> list[dict]:
     """League-wide scoring trend: [{round, matches, goals, avg}] per round."""
     return [
