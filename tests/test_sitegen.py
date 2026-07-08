@@ -61,12 +61,13 @@ def test_build_renders_all_page_types(db_path, tmp_path):
     assert "Nejvyšší výhra:" in group
 
     team = (out / "tym/power-rangers/index.html").read_text(encoding="utf-8")
-    assert "Power Rangers" in team and "Historie sezón" in team
-    # team page is tabbed: nav + three panels, full match log grouped by season
+    assert "Power Rangers" in team and "Kariéra po sezónách" in team
+    # team page is tabbed: five panels incl. Sezóny (#12) and Statistiky (#11)
     assert 'data-tabs' in team
-    for panel in ("prehled", "zapasy", "hraci"):
+    for panel in ("prehled", "zapasy", "sezony", "hraci", "statistiky"):
         assert f'data-panel="{panel}"' in team
     assert "2025-podzim" in team  # Zápasy season heading
+    assert "tier-chart" in team and "cards-chart" in team  # new charts
     assert (out / "tabs.js").exists()
     assert (out / "sort.js").exists()
     # S1 components: sparkline, favorites star, breadcrumbs, sortable tables
@@ -76,6 +77,13 @@ def test_build_renders_all_page_types(db_path, tmp_path):
     team_json = json.loads(
         (out / "tym/power-rangers/data.json").read_text(encoding="utf-8"))
     assert team_json["spark"].startswith("<svg")
+    # #11/#12: chart series in team data.json
+    assert "avg_conceded" in team_json["trend"] and "tier" in team_json["trend"]
+    # #10: group data.json carries prebuilt chart series
+    group_json = json.loads(
+        (out / "skupina/2025-podzim/6-a/data.json").read_text(encoding="utf-8"))
+    assert set(group_json["charts"]) >= {
+        "position", "scorer_race", "goals_per_round", "home_away"}
 
     records = (out / "rekordy/index.html").read_text(encoding="utf-8")
     assert "Nejlepší střelci" in records

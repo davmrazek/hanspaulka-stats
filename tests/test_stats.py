@@ -162,6 +162,44 @@ def test_team_cards_by_season(conn):
     assert by_season.get("2025-podzim", {}).get("yellow", 0) >= 1
 
 
+def test_build_career():
+    """Career rows aggregate W/D/L/score/points from matches and derive tier
+    movement vs the previous season."""
+    from analysis.stats import TeamMatch
+    def tm(season, tier, opp, gf, ga):
+        return TeamMatch("2020-01-01", season, tier, "a", 1, opp, "home", gf, ga)
+    matches = [
+        tm("2024-jaro", 6, "X", 3, 0),   # W
+        tm("2024-jaro", 6, "Y", 1, 1),   # D
+        tm("2025-jaro", 5, "Z", 0, 2),   # L (promoted 6 -> 5)
+    ]
+    history = [
+        {"season": "2024-jaro", "tier": 6, "group": "6-A", "position": 1, "final": True},
+        {"season": "2025-jaro", "tier": 5, "group": "5-A", "position": 9, "final": True},
+    ]
+    career = stats.build_career(matches, history)
+    assert career[0]["won"] == 1 and career[0]["drawn"] == 1 and career[0]["lost"] == 0
+    assert career[0]["gf"] == 4 and career[0]["ga"] == 1
+    assert career[0]["points"] == 1 * stats.WIN_POINTS + 1  # 2*1 + 1 draw = 3
+    assert career[0]["move"] == 0  # first season, no predecessor
+    assert career[1]["move"] == 1  # tier 6 -> 5 = promoted
+
+
+def test_group_stat_charts(conn):
+    group_id = conn.execute("SELECT id FROM groups LIMIT 1").fetchone()[0]
+    charts = stats.group_stat_charts(conn, group_id)
+    assert set(charts) == {"scorer_race", "goals_per_round", "home_away"}
+    ha = charts["home_away"]
+    total = ha["home"] + ha["draw"] + ha["away"]
+    played = conn.execute(
+        "SELECT COUNT(*) FROM matches WHERE group_id = ? AND home_goals IS NOT NULL",
+        (group_id,)).fetchone()[0]
+    assert total == played
+    # scorer race is cumulative: each leader's totals never decrease
+    for s in charts["scorer_race"]["series"]:
+        assert s["cum"] == sorted(s["cum"])
+
+
 def test_season_movers(tmp_path):
     """Synthetic two-season DB: one climber, one faller, one stayer."""
     c = store.connect(tmp_path / "movers.db")
