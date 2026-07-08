@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<nav class="crumbs">
+  <a href="{{ base }}/">Hanspaulka</a> ›
+  <a href="{{ base }}/sezona/{{ season.slug }}/">{{ season.slug }}</a> ›
+  <span>Rekordy</span>
+</nav>
+<h1>Rekordy sezóny {{ season.slug }}</h1>
+<p class="lead">Napříč všemi skupinami sezóny.
+<a href="{{ base }}/rekordy/">Rekordy všech dob →</a></p>
+
+<h2>Nejlepší střelci</h2>
+<table class="records" data-sort>
+  <tr><th>#</th><th>Hráč</th><th>Tým</th><th>Gólů</th></tr>
+  {% for name, team, goals in scorers %}
+  <tr>
+    <td>{{ loop.index }}.</td>
+    <td>{{ name }}</td>
+    <td>{% if team in teams_by_name %}<a href="{{ base }}{{ teams_by_name[team].url }}">{{ team }}</a>{% else %}{{ team }}{% endif %}</td>
+    <td><strong>{{ goals }}</strong></td>
+  </tr>
+  {% endfor %}
+</table>
+
+<div class="two-col">
+<div>
+<h2>Nejlepší útok</h2>
+<table class="records" data-sort>
+  <tr><th>Tým</th><th>Skupina</th><th>Z</th><th>Gólů</th></tr>
+  {% for r in boards.attack %}
+  <tr>
+    <td>{% if r.team in teams_by_name %}<a href="{{ base }}{{ teams_by_name[r.team].url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
+    <td><a href="{{ base }}{{ r.group_url }}">{{ r.group }}</a></td>
+    <td>{{ r.played }}</td>
+    <td><strong>{{ r.gf }}</strong></td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+<div>
+<h2>Nejlepší obrana</h2>
+<table class="records" data-sort>
+  <tr><th>Tým</th><th>Skupina</th><th>Z</th><th>Obdrženo</th></tr>
+  {% for r in boards.defense %}
+  <tr>
+    <td>{% if r.team in teams_by_name %}<a href="{{ base }}{{ teams_by_name[r.team].url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
+    <td><a href="{{ base }}{{ r.group_url }}">{{ r.group }}</a></td>
+    <td>{{ r.played }}</td>
+    <td><strong>{{ r.ga }}</strong></td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+</div>
+
+{% if fairplay %}
+<h2>Fair play (nejméně karet)</h2>
+<table class="records" data-sort>
+  <tr><th>Tým</th><th>Skupina</th><th>Z</th><th>ŽK</th><th>ČK</th></tr>
+  {% for r in fairplay %}
+  <tr>
+    <td>{% if r.team in teams_by_name %}<a href="{{ base }}{{ teams_by_name[r.team].url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
+    <td><a href="{{ base }}{{ r.group_url }}">{{ r.group }}</a></td>
+    <td>{{ r.played }}</td>
+    <td>{{ r.yellow }}</td>
+    <td>{{ r.red }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

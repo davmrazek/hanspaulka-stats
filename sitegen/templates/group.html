@@ -1,73 +1,121 @@
 {% extends "base.html" %}
 {% block content %}
+<nav class="crumbs">
+  <a href="{{ base }}/">Hanspaulka</a> ›
+  <a href="{{ base }}/sezona/{{ group.season_slug }}/">{{ group.season_slug }}</a> ›
+  <span>{{ group.name }}</span>
+</nav>
 <h1>Skupina {{ group.name }} · {{ group.season_slug }}</h1>
 
-<h2>{% if kind == 'vysledna' %}Výsledná tabulka{% else %}Průběžná tabulka{% endif %}</h2>
-<table class="standings">
-  <tr><th>#</th><th>Tým</th><th>Z</th><th>V</th><th>R</th><th>P</th><th>Skóre</th><th>B</th></tr>
-  {% for r in table %}
-  <tr>
-    <td>{{ r.position }}.</td>
-    <td>{% if r.team_url %}<a href="{{ base }}{{ r.team_url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
-    <td>{{ r.played }}</td><td>{{ r.won }}</td><td>{{ r.drawn }}</td><td>{{ r.lost }}</td>
-    <td>{{ r.gf }}:{{ r.ga }}</td><td><strong>{{ r.points }}</strong></td>
-  </tr>
-  {% endfor %}
-</table>
-{% if deductions %}
-<p class="note">Tabulka zahrnuje administrativní odečty bodů:
-{% for team, delta in deductions.items() %}{{ team }} ({{ delta }}){% if not loop.last %}, {% endif %}{% endfor %}.</p>
-{% endif %}
+<nav class="tabs" data-tabs>
+  <button data-tab="prehled">Přehled</button>
+  <button data-tab="tabulka">Tabulka</button>
+  <button data-tab="vysledky">Výsledky</button>
+  <button data-tab="statistiky">Statistiky</button>
+</nav>
 
-<h2>Vývoj pořadí po kolech</h2>
-<canvas id="position-chart" height="320"></canvas>
+<section data-panel="prehled">
+  {% if headline %}
+  <div class="badges">
+    <span class="badge">Nejvyšší výhra: {{ headline.home }} – {{ headline.away }} <strong>{{ headline.score }}</strong></span>
+  </div>
+  {% endif %}
 
-<h2>Křížová tabulka</h2>
-<div class="scroll-x">
-<table class="cross">
-  <tr><th></th>{% for t in cross_teams %}<th title="{{ t }}">{{ loop.index }}</th>{% endfor %}</tr>
-  {% for home in cross_teams %}
-  <tr>
-    <th>{{ loop.index }}. {{ home }}</th>
-    {% for away in cross_teams %}
-    <td>{% if home == away %}—{% else %}{{ cross.get(home, {}).get(away, '·') }}{% endif %}</td>
+  <h2>{% if kind == 'vysledna' %}Výsledná tabulka{% else %}Průběžná tabulka{% endif %}</h2>
+  <table class="standings">
+    <tr><th>#</th><th>Tým</th><th>Z</th><th>Skóre</th><th>B</th></tr>
+    {% for r in table[:5] %}
+    <tr>
+      <td>{{ r.position }}.</td>
+      <td>{% if r.team_url %}<a href="{{ base }}{{ r.team_url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
+      <td>{{ r.played }}</td>
+      <td>{{ r.gf }}:{{ r.ga }}</td><td><strong>{{ r.points }}</strong></td>
+    </tr>
     {% endfor %}
-  </tr>
-  {% endfor %}
-</table>
-</div>
+  </table>
+  <p><a href="#tabulka">Celá tabulka →</a></p>
 
-<h2>Střelci</h2>
-<ol class="scorers">
-  {% for name, team, goals in scorers %}
-  <li>{{ name }} ({{ team }}) — {{ goals }}</li>
-  {% endfor %}
-</ol>
+  <h2>Nejlepší střelci</h2>
+  <ol class="scorers">
+    {% for name, team, goals in scorers[:3] %}
+    <li>{{ name }} ({{ team }}) — {{ goals }}</li>
+    {% endfor %}
+  </ol>
+  <p><a href="#tabulka">Všichni střelci →</a></p>
+</section>
 
-{% if fairplay %}
-<h2>Fair play (karty)</h2>
-<table class="fairplay">
-  <tr><th>Tým</th><th>ŽK</th><th>ČK</th></tr>
-  {% for team, yc, rc in fairplay %}
-  <tr><td>{{ team }}</td><td>{{ yc }}</td><td>{{ rc }}</td></tr>
-  {% endfor %}
-</table>
-{% endif %}
+<section data-panel="tabulka">
+  <h2>{% if kind == 'vysledna' %}Výsledná tabulka{% else %}Průběžná tabulka{% endif %}</h2>
+  <table class="standings" data-sort>
+    <tr><th>#</th><th>Tým</th><th>Z</th><th>V</th><th>R</th><th>P</th><th>Skóre</th><th>B</th></tr>
+    {% for r in table %}
+    <tr>
+      <td>{{ r.position }}.</td>
+      <td>{% if r.team_url %}<a href="{{ base }}{{ r.team_url }}">{{ r.team }}</a>{% else %}{{ r.team }}{% endif %}</td>
+      <td>{{ r.played }}</td><td>{{ r.won }}</td><td>{{ r.drawn }}</td><td>{{ r.lost }}</td>
+      <td>{{ r.gf }}:{{ r.ga }}</td><td><strong>{{ r.points }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if deductions %}
+  <p class="note">Tabulka zahrnuje administrativní odečty bodů:
+  {% for team, delta in deductions.items() %}{{ team }} ({{ delta }}){% if not loop.last %}, {% endif %}{% endfor %}.</p>
+  {% endif %}
 
-<h2>Výsledky po kolech</h2>
-{% for round, matches in rounds.items() %}
-<h3>{{ round }}. kolo</h3>
-<table class="results">
-  {% for m in matches %}
-  <tr>
-    <td class="date">{{ m.date or '' }}</td>
-    <td>{% if m.home_url %}<a href="{{ base }}{{ m.home_url }}">{{ m.home }}</a>{% else %}{{ m.home }}{% endif %}
-        – {% if m.away_url %}<a href="{{ base }}{{ m.away_url }}">{{ m.away }}</a>{% else %}{{ m.away }}{% endif %}</td>
-    <td class="score">{{ m.score }} <span class="ht">{{ m.ht }}</span></td>
-  </tr>
+  <h2>Křížová tabulka</h2>
+  <div class="scroll-x">
+  <table class="cross">
+    <tr><th></th>{% for t in cross_teams %}<th title="{{ t }}">{{ loop.index }}</th>{% endfor %}</tr>
+    {% for home in cross_teams %}
+    <tr>
+      <th>{{ loop.index }}. {{ home }}</th>
+      {% for away in cross_teams %}
+      <td>{% if home == away %}—{% else %}{{ cross.get(home, {}).get(away, '·') }}{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+
+  <h2>Střelci</h2>
+  <ol class="scorers">
+    {% for name, team, goals in scorers %}
+    <li>{{ name }} ({{ team }}) — {{ goals }}</li>
+    {% endfor %}
+  </ol>
+
+  {% if fairplay %}
+  <h2>Fair play (karty)</h2>
+  <table class="fairplay" data-sort>
+    <tr><th>Tým</th><th>ŽK</th><th>ČK</th></tr>
+    {% for team, yc, rc in fairplay %}
+    <tr><td>{{ team }}</td><td>{{ yc }}</td><td>{{ rc }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</section>
+
+<section data-panel="vysledky">
+  <h2>Výsledky po kolech</h2>
+  {% for round, matches in rounds.items() %}
+  <h3>{{ round }}. kolo</h3>
+  <table class="results">
+    {% for m in matches %}
+    <tr>
+      <td class="date">{{ m.date or '' }}</td>
+      <td>{% if m.home_url %}<a href="{{ base }}{{ m.home_url }}">{{ m.home }}</a>{% else %}{{ m.home }}{% endif %}
+          – {% if m.away_url %}<a href="{{ base }}{{ m.away_url }}">{{ m.away }}</a>{% else %}{{ m.away }}{% endif %}</td>
+      <td class="score">{{ m.score }} <span class="ht">{{ m.ht }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
   {% endfor %}
-</table>
-{% endfor %}
+</section>
+
+<section data-panel="statistiky">
+  <h2>Vývoj pořadí po kolech</h2>
+  <canvas id="position-chart" height="320"></canvas>
+</section>
 {% endblock %}
 
 {% block scripts %}
@@ -76,24 +124,32 @@
 window.addEventListener("DOMContentLoaded", () => {
   const data = {{ chart_json | safe }};
   if (!data.rounds.length) return;
-  new Chart(document.getElementById("position-chart"), {
-    type: "line",
-    data: {
-      labels: data.rounds.map(r => r + "."),
-      datasets: data.series.map((s, i) => ({
-        label: s.team,
-        data: s.positions,
-        borderColor: `hsl(${(i * 137) % 360} 65% 45%)`,
-        backgroundColor: "transparent",
-        tension: 0.2,
-      })),
-    },
-    options: {
-      responsive: true,
-      scales: { y: { reverse: true, ticks: { stepSize: 1 }, title: { display: true, text: "Pořadí" } } },
-      plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
-    },
-  });
+  const panel = document.querySelector('[data-panel="statistiky"]');
+  let drawn = false;
+  function draw() {
+    if (drawn) return;
+    drawn = true;
+    new Chart(document.getElementById("position-chart"), {
+      type: "line",
+      data: {
+        labels: data.rounds.map(r => r + "."),
+        datasets: data.series.map((s, i) => ({
+          label: s.team,
+          data: s.positions,
+          borderColor: `hsl(${(i * 137) % 360} 65% 45%)`,
+          backgroundColor: "transparent",
+          tension: 0.2,
+        })),
+      },
+      options: {
+        responsive: true,
+        scales: { y: { reverse: true, ticks: { stepSize: 1 }, title: { display: true, text: "Pořadí" } } },
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
+      },
+    });
+  }
+  if (panel.classList.contains("active")) draw();
+  else panel.addEventListener("tabshow", draw, { once: true });
 });
 </script>
 {% endblock %}

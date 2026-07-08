@@ -162,6 +162,40 @@ def test_team_cards_by_season(conn):
     assert by_season.get("2025-podzim", {}).get("yellow", 0) >= 1
 
 
+def test_season_movers(tmp_path):
+    """Synthetic two-season DB: one climber, one faller, one stayer."""
+    c = store.connect(tmp_path / "movers.db")
+    s1 = store.upsert_season(c, 2024, "podzim", "2024-podzim")
+    s2 = store.upsert_season(c, 2025, "jaro", "2025-jaro")
+    g_old = {6: store.upsert_group(c, s1, 6, "a", "u"),
+             5: store.upsert_group(c, s1, 5, "a", "u")}
+    g_new = {6: store.upsert_group(c, s2, 6, "a", "u"),
+             5: store.upsert_group(c, s2, 5, "a", "u")}
+
+    def put(team, group_id, pos):
+        c.execute("INSERT OR IGNORE INTO teams(name, canonical_name) VALUES (?, ?)",
+                  (team, team))
+        tid = c.execute("SELECT id FROM teams WHERE name = ?", (team,)).fetchone()[0]
+        c.execute(
+            """INSERT OR REPLACE INTO standings
+               (group_id, team_id, kind, position, played, won, drawn, lost,
+                gf, ga, points)
+               VALUES (?, ?, 'vysledna', ?, 10, 5, 0, 5, 20, 20, 15)""",
+            (group_id, tid, pos))
+
+    put("Climber", g_old[6], 1); put("Climber", g_new[5], 8)
+    put("Faller", g_old[5], 10); put("Faller", g_new[6], 2)
+    put("Stayer", g_old[6], 5); put("Stayer", g_new[6], 5)
+    c.commit()
+
+    movers = stats.season_movers(c, "2024-podzim", "2025-jaro")
+    c.close()
+    assert [(m["team"], m["from_tier"], m["to_tier"], m["up"]) for m in movers] == [
+        ("Climber", 6, 5, True),
+        ("Faller", 5, 6, False),
+    ]
+
+
 # --- verification against the real backfilled DB -------------------------------
 
 
@@ -258,3 +292,38 @@ def test_season_history_continuity(real_conn):
     seasons = [h["season"] for h in history]
     assert seasons == sorted(seasons, key=lambda s: (
         int(s.split("-")[0]), stats.HALF_ORDER[s.split("-")[1]]))
+
+
+@needs_real_db
+def test_season_hub_functions(real_conn):
+    """Season-hub building blocks (#7-#9) on real data."""
+    gpr = stats.season_goals_per_round(real_conn, "2025-podzim")
+    assert gpr and all(r["avg"] > 0 for r in gpr)
+    assert gpr == sorted(gpr, key=lambda r: r["round"])
+
+    boards = stats.season_team_boards(real_conn, "2025-podzim")
+    assert len(boards["attack"]) == 10 and len(boards["defense"]) == 10
+    # attack sorted by goals desc, defense by conceded asc
+    assert boards["attack"] == sorted(
+        boards["attack"], key=lambda r: -r["gf"])
+    assert boards["defense"] == sorted(
+        boards["defense"], key=lambda r: r["ga"])
+
+    fp = stats.season_fairplay(real_conn, "2025-podzim")
+    assert fp and fp[0]["yellow"] + 2 * fp[0]["red"] <= \
+        fp[-1]["yellow"] + 2 * fp[-1]["red"]
+
+    scorers = stats.season_scorers(real_conn, "2025-podzim", limit=20)
+    assert len(scorers) == 20
+    assert scorers[0][2] >= scorers[-1][2]  # goals descending
+
+
+@needs_real_db
+def test_season_movers_real(real_conn):
+    """2025-jaro → 2025-podzim: every mover actually changed tier, no dups."""
+    movers = stats.season_movers(real_conn, "2025-jaro", "2025-podzim")
+    assert movers
+    teams = [m["team"] for m in movers]
+    assert len(teams) == len(set(teams))
+    assert all(m["from_tier"] != m["to_tier"] for m in movers)
+    assert all(m["up"] == (m["to_tier"] < m["from_tier"]) for m in movers)

@@ -30,3 +30,28 @@
     if (!e.target.closest(".search")) list.hidden = true;
   });
 })();
+
+// ★ favorites toggle on team pages; same hs_favs entries as the home dashboard.
+(function () {
+  const btn = document.getElementById("fav-toggle");
+  if (!btn) return;
+  const KEY = "hs_favs";
+  const get = () => {
+    try { return JSON.parse(localStorage.getItem(KEY)) ?? []; } catch { return []; }
+  };
+  const has = () => get().some((f) => f.u === btn.dataset.u);
+  const paint = () => {
+    const on = has();
+    btn.textContent = on ? "★" : "☆";
+    btn.classList.toggle("on", on);
+    btn.title = on ? "Odebrat z Moje týmy" : "Přidat do Moje týmy";
+  };
+  btn.addEventListener("click", () => {
+    const favs = has()
+      ? get().filter((f) => f.u !== btn.dataset.u)
+      : [...get(), { n: btn.dataset.n, u: btn.dataset.u }];
+    localStorage.setItem(KEY, JSON.stringify(favs));
+    paint();
+  });
+  paint();
+})();

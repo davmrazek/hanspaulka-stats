@@ -5,22 +5,33 @@
 na hráče v rámci týmu (stejné jméno v různých týmech = různé záznamy).</p>
 
 <h2>Nejlepší střelci</h2>
-<ol class="scorers">
+<table class="records" data-sort>
+  <tr><th>#</th><th>Hráč</th><th>Tým</th><th>Gólů</th></tr>
   {% for name, team, goals in scorers %}
-  <li>{{ name }} ({{ team }}) — <strong>{{ goals }}</strong></li>
+  <tr>
+    <td>{{ loop.index }}.</td>
+    <td>{{ name }}</td>
+    <td>{{ team }}</td>
+    <td><strong>{{ goals }}</strong></td>
+  </tr>
   {% endfor %}
-</ol>
+</table>
 
 <h2>Nejdelší série bez porážky</h2>
-<ol>
+<table class="records" data-sort>
+  <tr><th>#</th><th>Tým</th><th>Zápasů</th></tr>
   {% for name, run, url in unbeaten %}
-  <li>{% if url %}<a href="{{ base }}{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}
-      — <strong>{{ run }}</strong> zápasů</li>
+  <tr>
+    <td>{{ loop.index }}.</td>
+    <td>{% if url %}<a href="{{ base }}{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</td>
+    <td><strong>{{ run }}</strong></td>
+  </tr>
   {% endfor %}
-</ol>
+</table>
 
 <h2>Nejvyšší výhry</h2>
-<table class="results">
+<table class="results records" data-sort>
+  <tr><th>Sezóna</th><th>Zápas</th><th>Skóre</th></tr>
   {% for season, tier, letter, home, away, hg, ag in biggest %}
   <tr>
     <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
@@ -31,7 +42,8 @@ na hráče v rámci týmu (stejné jméno v různých týmech = různé záznamy
 </table>
 
 <h2>Nejvíc gólů v zápase</h2>
-<table class="results">
+<table class="results records" data-sort>
+  <tr><th>Sezóna</th><th>Zápas</th><th>Skóre</th></tr>
   {% for season, tier, letter, home, away, hg, ag in most_goals %}
   <tr>
     <td class="note">{{ season }} {{ tier }}{{ letter | upper }}</td>
@@ -40,4 +52,11 @@ na hráče v rámci týmu (stejné jméno v různých týmech = různé záznamy
   </tr>
   {% endfor %}
 </table>
+
+<h2>Rekordy sezón</h2>
+<ul class="group-list">
+  {% for s in seasons %}
+  <li><a href="{{ base }}/rekordy/{{ s.slug }}/">{{ s.slug }}</a></li>
+  {% endfor %}
+</ul>
 {% endblock %}
