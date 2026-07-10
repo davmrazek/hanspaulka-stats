@@ -5,6 +5,13 @@
 z veřejných výsledků {{ totals.seasons }} sezón: {{ totals.matches }} zápasů,
 {{ totals.goals }} gólů, {{ totals.teams }} týmů.</p>
 
+<div class="stat-tiles">
+  <div class="stat-tile"><div class="num" data-count="{{ totals.seasons }}">{{ totals.seasons }}</div><div class="lbl">Sezón</div></div>
+  <div class="stat-tile"><div class="num" data-count="{{ totals.matches }}">{{ totals.matches }}</div><div class="lbl">Zápasů</div></div>
+  <div class="stat-tile"><div class="num" data-count="{{ totals.goals }}">{{ totals.goals }}</div><div class="lbl">Gólů</div></div>
+  <div class="stat-tile"><div class="num" data-count="{{ totals.teams }}">{{ totals.teams }}</div><div class="lbl">Týmů</div></div>
+</div>
+
 {% if liga_dnes %}
 <section id="liga-dnes">
   <h2>Liga dnes — {{ liga_dnes.season }}, {{ liga_dnes.round }}. kolo</h2>

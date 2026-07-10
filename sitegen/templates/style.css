@@ -16,6 +16,9 @@
   --loss: #c0392b;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+/* sticky header clears in-page anchor jumps */
+:target, [id] { scroll-margin-top: 4rem; }
 body {
   margin: 0;
   font-family: Barlow, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
@@ -25,8 +28,9 @@ body {
   line-height: 1.6;
 }
 main { max-width: 56rem; margin: 0 auto; padding: 0 1rem 3rem; }
-a { color: var(--foreground); text-decoration: underline; text-decoration-color: var(--primary); text-decoration-thickness: 2px; text-underline-offset: 2px; }
+a { color: var(--foreground); text-decoration: underline; text-decoration-color: var(--primary); text-decoration-thickness: 2px; text-underline-offset: 2px; transition: background .12s ease, color .12s ease; }
 a:hover { background: var(--primary); color: var(--primary-foreground); text-decoration: none; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 h1, h2, h3 {
   font-family: Anton, Barlow, Arial, sans-serif;
@@ -46,6 +50,8 @@ h3 { font-size: .95rem; margin: 1rem 0 .3rem; color: var(--muted-foreground); }
 .site-header {
   display: flex; flex-wrap: wrap; gap: .6rem; align-items: stretch;
   background: var(--foreground);
+  position: sticky; top: 0; z-index: 20;
+  box-shadow: 0 2px 10px rgb(0 0 0 / .15);
 }
 .site-header .logo {
   display: flex; align-items: center;
@@ -58,6 +64,7 @@ h3 { font-size: .95rem; margin: 1rem 0 .3rem; color: var(--muted-foreground); }
 .site-header nav { display: flex; align-items: center; padding-right: .6rem; }
 .site-header nav a {
   color: #fff; font-weight: 600; text-decoration: none; padding: .4rem .6rem;
+  transition: color .12s ease;
 }
 .site-header nav a:hover { color: var(--primary); background: transparent; }
 .search { position: relative; flex: 1 1 12rem; max-width: 20rem; align-self: center; }
@@ -86,6 +93,7 @@ table {
 }
 th, td { padding: .35rem .55rem; text-align: left; border-bottom: 1px solid var(--border); }
 tr:last-child td { border-bottom: none; }
+table tr:hover td { background: rgb(251 186 0 / .07); }
 th { color: var(--muted-foreground); font-weight: 600; background: var(--muted); }
 td.score, th.score { text-align: right; white-space: nowrap; }
 td.date { white-space: nowrap; color: var(--muted-foreground); font-size: .85em; }
@@ -126,7 +134,9 @@ b.f-W, b.f-D, b.f-L { color: #fff; padding: 0 .25rem; border-radius: 3px; font-s
   display: inline-block; padding: .3rem .8rem; background: var(--card);
   border: 1px solid var(--border); border-radius: var(--radius);
   text-decoration: none; font-weight: 600;
+  transition: background .12s ease, border-color .12s ease, transform .12s ease;
 }
+.group-list a:active { transform: scale(.96); }
 .group-list a:hover { background: var(--primary); border-color: var(--primary); }
 details summary { cursor: pointer; }
 details summary h2 { display: inline-block; border: none; padding-left: 0; }
@@ -143,19 +153,23 @@ details summary h2 { display: inline-block; border: none; padding-left: 0; }
   border: 1px solid var(--border); border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
   padding: .45rem .9rem; cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
 }
 .tabs button.active { background: var(--primary); border-color: var(--primary); }
 .tabs button:hover { background: var(--primary); }
 /* no-JS fallback: without html.js all panels stay visible, stacked */
 .js [data-panel] { display: none; }
-.js [data-panel].active { display: block; }
+.js [data-panel].active { display: block; animation: hs-fade .22s ease; }
+@keyframes hs-fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
 .cards { display: grid; gap: 1rem; margin: 1rem 0; }
 @media (min-width: 40rem) { .cards { grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); } }
 .card {
   position: relative; background: var(--card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: .8rem 1rem;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgb(0 0 0 / .10); border-color: var(--primary); }
 .card h3 { margin: 0 0 .3rem; color: var(--foreground); }
 .card table { border: none; background: transparent; }
 .card-x {
@@ -252,3 +266,29 @@ table[data-sort] th.sort-desc::after { content: " ▼"; opacity: 1; }
 
 /* Liga dnes home section (#16) */
 #liga-dnes .card h3 { margin-top: 0; }
+
+/* homepage KPI stat tiles */
+.stat-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: .8rem; margin: 1.4rem 0; }
+@media (min-width: 40rem) { .stat-tiles { grid-template-columns: repeat(4, 1fr); } }
+.stat-tile {
+  background: var(--card); border: 1px solid var(--border);
+  border-top: .25rem solid var(--primary);
+  border-radius: var(--radius); padding: 1rem .6rem; text-align: center;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.stat-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgb(0 0 0 / .10); }
+.stat-tile .num {
+  font-family: Anton, Arial, sans-serif; font-weight: 400; font-synthesis: none;
+  font-size: 2.1rem; line-height: 1; color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.stat-tile .lbl {
+  margin-top: .35rem; color: var(--muted-foreground);
+  font-size: .78rem; text-transform: uppercase; letter-spacing: .05em;
+}
+
+/* respect reduced-motion: kill transitions/animations/smooth-scroll */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}

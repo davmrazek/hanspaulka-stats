@@ -1,3 +1,20 @@
+// KPI stat tiles: count up from 0 to the server-rendered value. The final
+// number is already in the DOM, so no-JS / reduced-motion just shows it.
+(function () {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const fmt = (n) => n.toLocaleString("cs-CZ");
+  for (const el of document.querySelectorAll(".stat-tile .num[data-count]")) {
+    const target = +el.dataset.count;
+    if (!target) continue;
+    const start = performance.now(), dur = 900;
+    (function tick(now) {
+      const p = Math.min((now - start) / dur, 1);
+      el.textContent = fmt(Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(tick);
+    })(start);
+  }
+})();
+
 // Homepage "Moje týmy" dashboard. Favorites live in localStorage (hs_favs,
 // shared with the ★ toggle on team pages); card data comes from each team's
 // prebuilt data.json. No favorites → invite state, no JS-only content lost.
